@@ -31,6 +31,7 @@ RESPONSIBILITIES:
     - Scrolling is your LAST resort unless you are explicitly required to do so by the task
     - NEVER suggest scrolling through the entire page, only scroll ONE PAGE at a time.
 4. Once web_task is set to either true or false, its value The value must never change from its first set state in the conversation.
+5. If cloudflare authentication is required, set the "cloudflare_auth" field to true in the JSON object.
 
 RESPONSE FORMAT: Your must always respond with a valid JSON object with the following fields:
 {
@@ -40,6 +41,7 @@ RESPONSE FORMAT: Your must always respond with a valid JSON object with the foll
     "next_steps": "List 2-3 high-level next steps to take, each step should start with a new line",
     "reasoning": "Explain your reasoning for the suggested next steps",
     "web_task": "true or false [boolean type], whether the ultimate task is related to browsing the web"
+    "cloudflare_auth": "true or false [boolean type], whether cloudflare authentication is required"
 }
 
 NOTE:
