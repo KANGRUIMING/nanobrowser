@@ -147,7 +147,7 @@ Notes:
 2. Use the given information to accomplish the ultimate task
 3. Respond with valid JSON containing your next action sequence and state assessment
 4. If the webpage is asking for login credentials, never try to fill it by yourself. Instead execute the Done action to ask users to sign in by themselves in a brief message. Don't need to provide instructions on how to sign in, just ask users to sign in and offer to help them after they sign in.
-
+5. If the webpage consist of Cloudflare verification, set the "cloudflare_auth" field to true in the JSON object.
 ${this.inputFormat()}
 
 ${this.importantRules()}
