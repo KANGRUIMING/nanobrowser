@@ -16,6 +16,7 @@ export const plannerOutputSchema = z.object({
   next_steps: z.string(),
   reasoning: z.string(),
   web_task: z.boolean(),
+  cloudflare_auth: z.boolean(),
 });
 
 export type PlannerOutput = z.infer<typeof plannerOutputSchema>;
