@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { RxDiscordLogo } from 'react-icons/rx';
 import { FiSettings } from 'react-icons/fi';
 import { PiPlusBold } from 'react-icons/pi';
 import { GrHistory } from 'react-icons/gr';
@@ -8,10 +7,15 @@ import { type Message, Actors, chatHistoryStore } from '@extension/storage';
 import MessageList from './components/MessageList';
 import ChatInput from './components/ChatInput';
 import ChatHistoryList from './components/ChatHistoryList';
-import TemplateList from './components/TemplateList';
 import { EventType, type AgentEvent, ExecutionState } from './types/event';
-import { defaultTemplates } from './templates';
 import './SidePanel.css';
+import { IoSettingsOutline } from 'react-icons/io5';
+import { VscHistory } from 'react-icons/vsc';
+import { useNavigate } from 'react-router-dom';
+import { useAtom } from 'jotai';
+import { useTranslation } from 'react-i18next';
+import { Message, sendMessage as sendMessageToBackground, stopConnection } from './utils';
+import { historyAtom } from './store';
 
 const SidePanel = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -448,13 +452,6 @@ const SidePanel = () => {
     }
   };
 
-  const handleTemplateSelect = (content: string) => {
-    console.log('handleTemplateSelect', content);
-    if (setInputTextRef.current) {
-      setInputTextRef.current(content);
-    }
-  };
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -508,13 +505,6 @@ const SidePanel = () => {
                 </button>
               </>
             )}
-            <a
-              href="https://discord.gg/NN3ABHggMK"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="header-icon text-sky-400 hover:text-sky-500">
-              <RxDiscordLogo size={20} />
-            </a>
             <button
               type="button"
               onClick={() => chrome.runtime.openOptionsPage()}
@@ -537,41 +527,21 @@ const SidePanel = () => {
           </div>
         ) : (
           <>
-            {messages.length === 0 && (
-              <>
-                <div className="border-t border-sky-100 backdrop-blur-sm p-2 shadow-sm mb-2">
-                  <ChatInput
-                    onSendMessage={handleSendMessage}
-                    onStopTask={handleStopTask}
-                    disabled={!inputEnabled || isHistoricalSession}
-                    showStopButton={showStopButton}
-                    setContent={setter => {
-                      setInputTextRef.current = setter;
-                    }}
-                  />
-                </div>
-                <div>
-                  <TemplateList templates={defaultTemplates} onTemplateSelect={handleTemplateSelect} />
-                </div>
-              </>
-            )}
             <div className="flex-1 overflow-y-scroll overflow-x-hidden scrollbar-gutter-stable p-4 scroll-smooth">
               <MessageList messages={messages} />
               <div ref={messagesEndRef} />
             </div>
-            {messages.length > 0 && (
-              <div className="border-t border-sky-100 backdrop-blur-sm p-2 shadow-sm">
-                <ChatInput
-                  onSendMessage={handleSendMessage}
-                  onStopTask={handleStopTask}
-                  disabled={!inputEnabled || isHistoricalSession}
-                  showStopButton={showStopButton}
-                  setContent={setter => {
-                    setInputTextRef.current = setter;
-                  }}
-                />
-              </div>
-            )}
+            <div className="border-t border-sky-100 backdrop-blur-sm p-2 shadow-sm">
+              <ChatInput
+                onSendMessage={handleSendMessage}
+                onStopTask={handleStopTask}
+                disabled={!inputEnabled || isHistoricalSession}
+                showStopButton={showStopButton}
+                setContent={setter => {
+                  setInputTextRef.current = setter;
+                }}
+              />
+            </div>
           </>
         )}
       </div>
