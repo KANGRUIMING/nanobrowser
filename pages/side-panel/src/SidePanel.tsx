@@ -11,6 +11,7 @@ import ChatHistoryList from './components/ChatHistoryList';
 import TemplateList from './components/TemplateList';
 import { EventType, type AgentEvent, ExecutionState } from './types/event';
 import { defaultTemplates } from './templates';
+import { usePdfUpload } from './hooks/usePdfUpload';
 import './SidePanel.css';
 
 const SidePanel = () => {
@@ -302,6 +303,20 @@ const SidePanel = () => {
     [stopConnection],
   );
 
+  // Use the PDF upload hook
+  const { uploadingPdf, handlePdfUpload } = usePdfUpload({
+    isFollowUpMode,
+    isHistoricalSession,
+    sessionIdRef,
+    setupConnection,
+    sendMessage,
+    appendMessage,
+    portRef,
+    setInputEnabled,
+    setShowStopButton,
+    setCurrentSessionId,
+  });
+
   const handleSendMessage = async (text: string) => {
     console.log('handleSendMessage', text);
 
@@ -560,12 +575,14 @@ const SidePanel = () => {
                   <ChatInput
                     onSendMessage={handleSendMessage}
                     onStopTask={handleStopTask}
-                    disabled={!inputEnabled || isHistoricalSession}
+                    disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
                     showStopButton={showStopButton}
                     setContent={setter => {
                       setInputTextRef.current = setter;
                     }}
                     isDarkMode={isDarkMode}
+                    onFileUpload={handlePdfUpload}
+                    isUploading={uploadingPdf}
                   />
                 </div>
                 <div>
@@ -588,12 +605,14 @@ const SidePanel = () => {
                 <ChatInput
                   onSendMessage={handleSendMessage}
                   onStopTask={handleStopTask}
-                  disabled={!inputEnabled || isHistoricalSession}
+                  disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
                   showStopButton={showStopButton}
                   setContent={setter => {
                     setInputTextRef.current = setter;
                   }}
                   isDarkMode={isDarkMode}
+                  onFileUpload={handlePdfUpload}
+                  isUploading={uploadingPdf}
                 />
               </div>
             )}

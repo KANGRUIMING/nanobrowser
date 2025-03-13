@@ -15,12 +15,14 @@ import {
   sendKeysActionSchema,
   scrollToTextActionSchema,
   cacheContentActionSchema,
+  searchLinkedInActionSchema,
 } from './schemas';
 import { z } from 'zod';
 import { createLogger } from '@src/background/log';
 import { PromptTemplate } from '@langchain/core/prompts';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { ExecutionState, Actors } from '../event/types';
+import { createLinkedInSearchAction } from './linkedin';
 
 const logger = createLogger('Action');
 
@@ -136,6 +138,9 @@ export class ActionBuilder {
       });
     }, searchGoogleActionSchema);
     actions.push(searchGoogle);
+
+    const searchLinkedIn = createLinkedInSearchAction(this.context);
+    actions.push(searchLinkedIn);
 
     const goToUrl = new Action(async (input: { url: string }) => {
       const msg = `Navigating to ${input.url}`;
