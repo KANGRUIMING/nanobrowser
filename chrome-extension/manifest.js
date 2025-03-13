@@ -39,7 +39,7 @@ const manifest = withSidePanel({
   name: '__MSG_extensionName__',
   version: packageJson.version,
   description: '__MSG_extensionDescription__',
-  host_permissions: ['<all_urls>'],
+  host_permissions: ['*://*.linkedin.com/*'],
   permissions: ['storage', 'scripting', 'tabs', 'activeTab', 'debugger'],
   options_page: 'options/index.html',
   background: {
@@ -54,7 +54,7 @@ const manifest = withSidePanel({
   },
   content_scripts: [
     {
-      matches: ['http://*/*', 'https://*/*', '<all_urls>'],
+      matches: ['*://*.linkedin.com/*'],
       js: ['content/index.iife.js'],
     },
   ],

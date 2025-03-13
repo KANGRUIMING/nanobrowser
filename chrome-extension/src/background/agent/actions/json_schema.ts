@@ -53,6 +53,18 @@ export const jsonNavigatorOutputSchema = {
             type: 'object',
             nullable: true,
           },
+          search_linkedin: {
+            properties: {
+              query: {
+                title: 'Query',
+                type: 'string',
+              },
+            },
+            required: ['query'],
+            title: 'SearchLinkedInAction',
+            type: 'object',
+            nullable: true,
+          },
           go_to_url: {
             properties: {
               url: {

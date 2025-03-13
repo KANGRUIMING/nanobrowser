@@ -23,6 +23,14 @@ export const searchGoogleActionSchema: ActionSchema = {
   }),
 };
 
+export const searchLinkedInActionSchema: ActionSchema = {
+  name: 'search_linkedin',
+  description: 'Search LinkedIn in the current tab',
+  schema: z.object({
+    query: z.string(),
+  }),
+};
+
 export const goToUrlActionSchema: ActionSchema = {
   name: 'go_to_url',
   description: 'Navigate to URL in the current tab',
