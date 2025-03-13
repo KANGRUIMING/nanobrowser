@@ -11,6 +11,9 @@ const logger = createLogger('background');
 const browserContext = new BrowserContext({});
 let currentExecutor: Executor | null = null;
 let currentPort: chrome.runtime.Port | null = null;
+// Store for resume data and job keywords
+let resumeData = null;
+let jobKeywords = null;
 
 // Setup side panel behavior
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(error => console.error(error));
@@ -20,7 +23,9 @@ async function isScriptInjected(tabId: number): Promise<boolean> {
   try {
     const results = await chrome.scripting.executeScript({
       target: { tabId },
-      func: () => Object.prototype.hasOwnProperty.call(window, 'buildDomTree'),
+      func: () =>
+        Object.prototype.hasOwnProperty.call(window, 'buildDomTree') &&
+        Object.prototype.hasOwnProperty.call(window, 'parserReadability'),
     });
     return results[0]?.result || false;
   } catch (err) {
@@ -29,7 +34,7 @@ async function isScriptInjected(tabId: number): Promise<boolean> {
   }
 }
 
-// // Function to inject the buildDomTree script
+// Function to inject the DOM scripts
 async function injectBuildDomTree(tabId: number) {
   try {
     // Check if already injected
@@ -39,10 +44,18 @@ async function injectBuildDomTree(tabId: number) {
       return;
     }
 
+    // First inject the readability parser
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['parserReadability.js'],
+    });
+
+    // Then inject the DOM tree builder
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ['buildDomTree.js'],
     });
+
     console.log('Scripts successfully injected');
   } catch (err) {
     console.error('Failed to inject scripts:', err);
@@ -91,13 +104,53 @@ chrome.runtime.onConnect.addListener(port => {
             if (!message.tabId) return port.postMessage({ type: 'error', error: 'No tab ID provided' });
 
             logger.info('new_task', message.tabId, message.task);
-            currentExecutor = await setupExecutor(message.taskId, message.task, browserContext);
+
+            // Parse resume and keywords from task if available
+            if (message.resumeData) {
+              resumeData = message.resumeData;
+              logger.info('Resume data received');
+            }
+
+            if (message.jobKeywords) {
+              jobKeywords = message.jobKeywords;
+              logger.info('Job keywords received:', jobKeywords);
+            }
+
+            // Enhance task with resume and keywords if available
+            let enhancedTask = message.task;
+            if (resumeData || jobKeywords) {
+              enhancedTask = formatJobApplicationTask(message.task, resumeData, jobKeywords);
+            }
+
+            currentExecutor = await setupExecutor(message.taskId, enhancedTask, browserContext);
             subscribeToExecutorEvents(currentExecutor);
 
             const result = await currentExecutor.execute();
             logger.info('new_task execution result', message.tabId, result);
             break;
           }
+
+          case 'update_resume': {
+            resumeData = message.resumeData;
+            logger.info('Resume data updated');
+            port.postMessage({ type: 'resume_updated' });
+            break;
+          }
+
+          case 'update_keywords': {
+            jobKeywords = message.jobKeywords;
+            logger.info('Job keywords updated:', jobKeywords);
+            port.postMessage({ type: 'keywords_updated' });
+            break;
+          }
+
+          case 'clear_resume': {
+            resumeData = null;
+            logger.info('Resume data cleared');
+            port.postMessage({ type: 'resume_cleared' });
+            break;
+          }
+
           case 'follow_up_task': {
             if (!message.task) return port.postMessage({ type: 'error', error: 'No follow up task provided' });
             if (!message.tabId) return port.postMessage({ type: 'error', error: 'No tab ID provided' });
@@ -162,6 +215,39 @@ chrome.runtime.onConnect.addListener(port => {
     });
   }
 });
+
+// Function to format the job application task with resume and keywords
+function formatJobApplicationTask(task: string, resumeData: any, jobKeywords: string[]): string {
+  let enhancedTask = task;
+
+  if (resumeData) {
+    // For PDF resumes, use the extracted text data
+    if (resumeData.resumeText) {
+      enhancedTask += `\n\nRESUME DATA:\n${resumeData.resumeText}`;
+
+      // Add a note that this is a text-only representation
+      if (resumeData.originalFormat === 'PDF') {
+        enhancedTask += '\n(Note: This is a text-only representation of the PDF resume)';
+      }
+    } else {
+      // For non-PDF data, stringify the object
+      enhancedTask += `\n\nRESUME DATA:\n${JSON.stringify(resumeData, null, 2)}`;
+    }
+  }
+
+  if (jobKeywords && jobKeywords.length > 0) {
+    enhancedTask += `\n\nJOB KEYWORDS: ${jobKeywords.join(', ')}`;
+  }
+
+  // Add instructions for handling resume data in job applications
+  enhancedTask += `\n\nIMPORTANT INSTRUCTIONS:
+1. Use ONLY the information from the resume to fill out job applications
+2. Do not fabricate any information not present in the resume
+3. If required fields are missing from the resume, notify the user
+4. For login/signup screens, use Google Sign-in when available`;
+
+  return enhancedTask;
+}
 
 async function setupExecutor(taskId: string, task: string, browserContext: BrowserContext) {
   const providers = await llmProviderStore.getAllProviders();

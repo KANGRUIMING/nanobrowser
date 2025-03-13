@@ -15,6 +15,7 @@ import {
   sendKeysActionSchema,
   scrollToTextActionSchema,
   cacheContentActionSchema,
+  stealthModeActionSchema,
 } from './schemas';
 import { z } from 'zod';
 import { createLogger } from '@src/background/log';
@@ -259,19 +260,47 @@ export class ActionBuilder {
     actions.push(openTab);
 
     // Content Actions
-    // TODO: this is not used currently, need to improve on input size
     const extractContent = new Action(async (input: z.infer<typeof extractContentActionSchema.schema>) => {
       const goal = input.goal;
       const page = await this.context.browserContext.getCurrentPage();
       const content = await page.getReadabilityContent();
+
+      // Get current browser state for context
+      const browserState = await this.context.browserContext.getState();
+
+      // Create a more comprehensive prompt
       const promptTemplate = PromptTemplate.fromTemplate(
-        'Your task is to extract the content of the page. You will be given a page and a goal and you should extract all relevant information around this goal from the page. If the goal is vague, summarize the page. Respond in json format. Extraction goal: {goal}, Page: {page}',
+        'Your task is to extract and analyze the content of this webpage in relation to the specified goal. Extract all relevant information including specific job details (title, company, requirements, etc.) if applicable.\n\n' +
+          'GOAL: {goal}\n\n' +
+          'PAGE TITLE: {title}\n' +
+          'PAGE URL: {url}\n\n' +
+          'PAGE CONTENT:\n{content}\n\n' +
+          'Provide a detailed summary focusing on:\n' +
+          '1. Key information relevant to the goal\n' +
+          '2. Important form fields or interactive elements\n' +
+          '3. Specific job details including company name, position title, requirements\n' +
+          '4. Any obstacles or special requirements (login, etc.)\n\n' +
+          'Format your response to be concise but comprehensive.',
       );
-      const prompt = await promptTemplate.invoke({ goal, page: content.content });
+
+      const prompt = await promptTemplate.invoke({
+        goal,
+        title: browserState.title,
+        url: browserState.url,
+        content: content.content,
+      });
 
       try {
         const output = await this.extractorLLM.invoke(prompt);
-        const msg = `📄  Extracted from page\n: ${output.content}\n`;
+        const msg = `📄 CONTENT ANALYSIS:\n${output.content}\n`;
+
+        // Add this to page history with improved summary
+        this.context.messageManager.addPageToHistory(
+          browserState.url,
+          browserState.title || 'No title',
+          typeof output.content === 'string' ? output.content : JSON.stringify(output.content),
+        );
+
         return new ActionResult({
           extractedContent: msg,
           includeInMemory: true,
@@ -287,6 +316,67 @@ export class ActionBuilder {
       }
     }, extractContentActionSchema);
     actions.push(extractContent);
+
+    // Add a new action to analyze browsing history
+    const analyzeHistoryActionSchema = {
+      name: 'analyze_browser_history',
+      description: 'Analyze browser history to gain insights about previous navigation and actions',
+      schema: z.object({
+        goal: z
+          .string()
+          .describe('The analysis goal like "Find login patterns" or "Identify previous job applications"'),
+      }),
+    };
+
+    const analyzeHistory = new Action(async (input: z.infer<typeof analyzeHistoryActionSchema.schema>) => {
+      const goal = input.goal;
+
+      // Get the browsing history
+      const historyContext = this.context.messageManager.getPageHistoryContext();
+
+      if (!historyContext || historyContext.trim() === '') {
+        return new ActionResult({
+          extractedContent: 'No browsing history available to analyze.',
+          includeInMemory: true,
+        });
+      }
+
+      const promptTemplate = PromptTemplate.fromTemplate(
+        'Analyze the browser history below and provide insights related to the specified goal.\n\n' +
+          'ANALYSIS GOAL: {goal}\n\n' +
+          'BROWSER HISTORY:\n{history}\n\n' +
+          'Provide a detailed analysis including:\n' +
+          '1. Patterns in navigation\n' +
+          '2. Successful and unsuccessful interactions\n' +
+          '3. Progress made toward completing tasks\n' +
+          '4. Recommendations for next steps\n' +
+          '5. Any loops or repetitive behavior detected\n\n' +
+          'Be specific and actionable in your analysis.',
+      );
+
+      const prompt = await promptTemplate.invoke({
+        goal,
+        history: historyContext,
+      });
+
+      try {
+        const output = await this.extractorLLM.invoke(prompt);
+        const msg = `🔍 HISTORY ANALYSIS:\n${output.content}\n`;
+
+        return new ActionResult({
+          extractedContent: msg,
+          includeInMemory: true,
+        });
+      } catch (error) {
+        logger.error(`Error analyzing history: ${error instanceof Error ? error.message : String(error)}`);
+        const msg = 'Failed to analyze browsing history.';
+        return new ActionResult({
+          extractedContent: msg,
+          includeInMemory: true,
+        });
+      }
+    }, analyzeHistoryActionSchema);
+    actions.push(analyzeHistory);
 
     // cache content for future use
     const cacheContent = new Action(async (input: z.infer<typeof cacheContentActionSchema.schema>) => {
@@ -356,6 +446,97 @@ export class ActionBuilder {
       }
     }, scrollToTextActionSchema);
     actions.push(scrollToText);
+
+    // Add a new action to revisit a page from history
+    const revisitPageActionSchema = {
+      name: 'revisit_page',
+      description: 'Revisit a page that was previously seen in browser history',
+      schema: z.object({
+        url_pattern: z
+          .string()
+          .describe('A pattern to match against URLs in the browsing history, or the exact URL to revisit'),
+      }),
+    };
+
+    const revisitPage = new Action(async (input: z.infer<typeof revisitPageActionSchema.schema>) => {
+      const urlPattern = input.url_pattern.toLowerCase();
+
+      // Get page history from message manager
+      const pageHistory = this.context.messageManager.getPageHistoryRaw();
+
+      if (!pageHistory || pageHistory.length === 0) {
+        return new ActionResult({
+          extractedContent: 'No browsing history available to revisit pages.',
+          includeInMemory: true,
+          error: 'No browsing history available',
+        });
+      }
+
+      // Find matching pages in history
+      const matchingPages = pageHistory.filter(
+        (page: { url: string; title: string; summary: string; timestamp: number }) =>
+          page.url.toLowerCase().includes(urlPattern),
+      );
+
+      if (matchingPages.length === 0) {
+        return new ActionResult({
+          extractedContent: `No pages matching pattern "${urlPattern}" found in browsing history.`,
+          includeInMemory: true,
+          error: `No matching pages found for pattern: ${urlPattern}`,
+        });
+      }
+
+      // Get the most recent matching page
+      const pageToRevisit = matchingPages[matchingPages.length - 1];
+
+      // Navigate to the page
+      try {
+        this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_START, `Revisiting page: ${pageToRevisit.url}`);
+        await this.context.browserContext.navigateTo(pageToRevisit.url);
+        const msg = `Revisited page from history: ${pageToRevisit.title} (${pageToRevisit.url})`;
+        this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_OK, msg);
+        return new ActionResult({
+          extractedContent: msg,
+          includeInMemory: true,
+        });
+      } catch (error) {
+        logger.error(`Error revisiting page: ${error instanceof Error ? error.message : String(error)}`);
+        const msg = `Failed to revisit page: ${pageToRevisit.url}`;
+        this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_FAIL, msg);
+        return new ActionResult({
+          extractedContent: msg,
+          includeInMemory: true,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }, revisitPageActionSchema);
+    actions.push(revisitPage);
+
+    // Add stealth mode action to bypass anti-bot protection
+    const stealthMode = new Action(async (input: z.infer<typeof stealthModeActionSchema.schema>) => {
+      const enabled = input.enabled;
+      const level = input.level || 'medium'; // Default to medium protection
+
+      // Set up the context with stealth mode settings
+      this.context.browserContext.setStealthMode(enabled, level);
+
+      const statusText = enabled
+        ? `Enabled stealth mode with ${level} protection level to bypass anti-bot measures`
+        : 'Disabled stealth mode';
+
+      this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_START, statusText);
+
+      // Add random delay to make it harder to detect automation
+      await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 1000) + 500));
+
+      this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_OK, statusText);
+
+      return new ActionResult({
+        extractedContent: statusText,
+        includeInMemory: true,
+      });
+    }, stealthModeActionSchema);
+    actions.push(stealthMode);
 
     return actions;
   }

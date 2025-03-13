@@ -1,7 +1,7 @@
 {
-  "name": "chrome-extension",
+  "name": "job-application-agent",
   "version": "0.1.1",
-  "description": "chrome extension - core settings",
+  "description": "Job Application Agent - Chrome extension for automating job applications",
   "type": "module",
   "scripts": {
     "clean:node_modules": "pnpx rimraf node_modules",

@@ -7,10 +7,11 @@ interface Template {
 
 interface TemplateListProps {
   templates: Template[];
-  onTemplateSelect: (content: string) => void;
+  onSelect: (content: string) => void;
+  disabled?: boolean;
 }
 
-const TemplateList: React.FC<TemplateListProps> = ({ templates, onTemplateSelect }) => {
+const TemplateList: React.FC<TemplateListProps> = ({ templates, onSelect, disabled = false }) => {
   return (
     <div className="w-full px-4 pt-2 pb-4">
       <h2 className="text-base font-semibold text-gray-700 mb-3 px-1">Quick Start</h2>
@@ -23,9 +24,12 @@ const TemplateList: React.FC<TemplateListProps> = ({ templates, onTemplateSelect
           {templates.map(template => (
             <button
               key={template.id}
-              onClick={() => onTemplateSelect(template.content)}
-              onKeyDown={e => e.key === 'Enter' && onTemplateSelect(template.content)}
-              className="w-full group backdrop-blur-sm bg-white/50 hover:bg-white/70 rounded-lg border border-sky-100 shadow-sm transition-all text-left"
+              onClick={() => onSelect(template.content)}
+              onKeyDown={e => e.key === 'Enter' && onSelect(template.content)}
+              disabled={disabled}
+              className={`w-full group backdrop-blur-sm bg-white/50 hover:bg-white/70 rounded-lg border border-sky-100 shadow-sm transition-all text-left ${
+                disabled ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
               type="button">
               <div className="p-3">
                 <p className="text-sm font-medium text-gray-900">{template.title}</p>

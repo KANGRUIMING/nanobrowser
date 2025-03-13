@@ -147,3 +147,18 @@ export const selectDropdownOptionActionSchema: ActionSchema = {
     text: z.string(),
   }),
 };
+
+export const stealthModeActionSchema: ActionSchema = {
+  name: 'stealth_mode',
+  description:
+    'Enable or disable stealth mode to bypass anti-bot protection with human-like browsing behavior. Use this when you encounter websites that seem to block or limit automation.',
+  schema: z.object({
+    enabled: z.boolean().describe('Set to true to enable stealth mode, false to disable it'),
+    level: z
+      .enum(['low', 'medium', 'high'])
+      .describe(
+        'Protection level: low (basic timing randomization), medium (adds mouse movement simulation), high (adds micro-movements, typos, and more randomized behavior)',
+      )
+      .optional(),
+  }),
+};

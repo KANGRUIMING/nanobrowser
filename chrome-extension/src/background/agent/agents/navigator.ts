@@ -101,110 +101,170 @@ export class NavigatorAgent extends BaseAgent<z.ZodType, NavigatorResult> {
   }
 
   async execute(): Promise<AgentOutput<NavigatorResult>> {
-    const agentOutput: AgentOutput<NavigatorResult> = {
-      id: this.id,
-    };
-
-    let cancelled = false;
-
     try {
-      this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.STEP_START, 'Navigating...');
+      // Before executing, make sure there's a valid state with a goal
+      await this.ensureStateHasGoal();
 
-      const messageManager = this.context.messageManager;
-      // add the browser state message
+      // Add current state to memory periodically
       await this.addStateMessageToMemory();
-      // check if the task is paused or stopped
-      if (this.context.paused || this.context.stopped) {
-        cancelled = true;
-        return agentOutput;
+
+      // Record step start
+      this.context.nSteps += 1;
+      if (this.context.nSteps > this.context.options.maxSteps) {
+        await this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.TASK_FAIL, 'Reached maximum number of steps');
+        return {
+          id: this.id,
+          error: 'Reached maximum number of steps',
+        };
       }
 
-      // call the model to get the actions to take
-      const inputMessages = messageManager.getMessages();
-      const modelOutput = await this.invoke(inputMessages);
+      const messages = this.context.messageManager.getMessages();
+      await this.context.emitEvent(
+        Actors.NAVIGATOR,
+        ExecutionState.STEP_START,
+        `Executing step ${this.context.nSteps}/${this.context.options.maxSteps}`,
+      );
 
-      // check if the task is paused or stopped
-      if (this.context.paused || this.context.stopped) {
-        cancelled = true;
-        return agentOutput;
+      // Use model to get action step
+      let response: this['ModelOutput'];
+      try {
+        response = await this.invoke(messages);
+      } catch (error) {
+        // Check if the error is an authentication error
+        if (isAuthenticationError(error)) {
+          await this.context.emitEvent(
+            Actors.NAVIGATOR,
+            ExecutionState.TASK_FAIL,
+            'Invalid authentication: please check your API key or quota.',
+          );
+          throw new ChatModelAuthError(error instanceof Error ? error.message : String(error));
+        } else {
+          logger.error('Error invoking model', error);
+          throw error;
+        }
       }
-      // remove the last state message from memory before adding the model output
-      this.removeLastStateMessageFromMemory();
-      this.addModelOutputToMemory(modelOutput);
 
-      // take the actions
-      const actionResults = await this.doMultiAction(modelOutput);
-      this.context.actionResults = actionResults;
+      // Call the action(s) based on the model's output
+      const actionResults = await this.doMultiAction(response);
 
-      // check if the task is paused or stopped
-      if (this.context.paused || this.context.stopped) {
-        cancelled = true;
-        return agentOutput;
+      // Check if any of the actions signal that the task is complete
+      const isDone = actionResults.some(result => result.isDone);
+
+      // Preserve the goal in case it was lost during navigation or script blocking
+      await this.ensureStateHasGoal();
+
+      if (isDone) {
+        await this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.TASK_OK, 'Task completed successfully');
+        return {
+          id: this.id,
+          result: {
+            done: true,
+          },
+        };
       }
-      // emit event
-      this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.STEP_OK, 'Navigation done');
-      let done = false;
-      if (actionResults.length > 0 && actionResults[actionResults.length - 1].isDone) {
-        done = true;
-      }
-      agentOutput.result = { done };
-      return agentOutput;
+
+      // Return that this step has been completed successfully, but we're not done yet
+      return {
+        id: this.id,
+        result: {
+          done: false,
+        },
+      };
     } catch (error) {
-      this.removeLastStateMessageFromMemory();
-      // Check if this is an authentication error
-      if (isAuthenticationError(error)) {
-        throw new ChatModelAuthError('Navigator API Authentication failed. Please verify your API key', error);
+      // Increment failure counter
+      this.context.consecutiveFailures += 1;
+
+      // If too many failures, signal to stop
+      if (this.context.consecutiveFailures >= this.context.options.maxFailures) {
+        await this.context.emitEvent(
+          Actors.NAVIGATOR,
+          ExecutionState.TASK_FAIL,
+          `Too many failures (${this.context.consecutiveFailures}/${this.context.options.maxFailures})`,
+        );
+        return {
+          id: this.id,
+          error: `Too many failures (${this.context.consecutiveFailures}/${this.context.options.maxFailures})`,
+        };
       }
 
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorString = `Navigation failed: ${errorMessage}`;
-      logger.error(errorString);
-      this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.STEP_FAIL, errorString);
-      agentOutput.error = errorMessage;
-      return agentOutput;
-    } finally {
-      // if the task is cancelled, remove the last state message from memory and emit event
-      if (cancelled) {
-        this.removeLastStateMessageFromMemory();
-        this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.STEP_CANCEL, 'Navigation cancelled');
+      // Report the error
+      let errorMsg = error instanceof Error ? error.message : String(error);
+      if (errorMsg.length > this.context.options.maxErrorLength) {
+        errorMsg = errorMsg.substring(0, this.context.options.maxErrorLength) + '...';
       }
+      await this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.STEP_FAIL, errorMsg);
+
+      // Try to add a clean human message to help the model recover
+      try {
+        await this.context.messageManager.addMessageWithTokens(
+          new HumanMessage(
+            `I encountered an error: ${errorMsg}. I'll try to recover and continue with the task from the last valid state.`,
+          ),
+        );
+      } catch (messageError) {
+        logger.error('Error adding recovery message', messageError);
+        // If we can't even add a message, something is severely wrong
+        await this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.TASK_FAIL, 'Failed to recover from error');
+        return {
+          id: this.id,
+          error: `Failed to recover from error: ${
+            messageError instanceof Error ? messageError.message : String(messageError)
+          }`,
+        };
+      }
+
+      // Remove the failed state message
+      await this.removeLastStateMessageFromMemory();
+
+      // Check if we need to wait before retrying (avoid hammering the model)
+      if (this.context.options.retryDelay > 0) {
+        await new Promise(resolve => setTimeout(resolve, this.context.options.retryDelay * 1000));
+      }
+
+      // Try to ensure we have a valid goal before continuing
+      await this.ensureStateHasGoal();
+
+      // Return that we've handled the error, but not completed the task
+      return {
+        id: this.id,
+        result: {
+          done: false,
+        },
+      };
     }
   }
 
   /**
    * Add the state message to the memory
    */
-  public async addStateMessageToMemory() {
-    if (this.context.stateMessageAdded) {
+  public async addStateMessageToMemory(customState?: Record<string, unknown>) {
+    // If already added, don't add again unless we have a custom state
+    if (this.context.stateMessageAdded && !customState) {
       return;
     }
 
+    // Get the message manager
     const messageManager = this.context.messageManager;
-    const options = this.context.options;
-    // Handle results that should be included in memory
-    if (this.context.actionResults.length > 0) {
-      let index = 0;
-      for (const r of this.context.actionResults) {
-        if (r.includeInMemory) {
-          if (r.extractedContent) {
-            const msg = new HumanMessage(`Action result: ${r.extractedContent}`);
-            // logger.info('Adding action result to memory', msg.content);
-            messageManager.addMessageWithTokens(msg);
-          }
-          if (r.error) {
-            const msg = new HumanMessage(`Action error: ${r.error.toString().slice(-options.maxErrorLength)}`);
-            logger.info('Adding action error to memory', msg.content);
-            messageManager.addMessageWithTokens(msg);
-          }
-          // reset this action result to empty, we dont want to add it again in the state message
-          this.context.actionResults[index] = new ActionResult();
-        }
-        index++;
-      }
+
+    let state: string;
+    if (customState) {
+      // Use the provided custom state
+      state = JSON.stringify(customState);
+    } else {
+      // Generate a default state
+      const stateObj = {
+        current_state: {
+          page_summary: 'Current page content',
+          evaluation_previous_goal: 'No previous goal to evaluate',
+          memory: '',
+          next_goal: 'To be determined',
+        },
+      };
+      state = JSON.stringify(stateObj);
     }
 
-    const state = await this.prompt.getUserMessage(this.context);
-    messageManager.addStateMessage(state);
+    // Add the state message
+    messageManager.addMessageWithTokens(new HumanMessage(state));
     this.context.stateMessageAdded = true;
   }
 
@@ -284,5 +344,96 @@ export class NavigatorAgent extends BaseAgent<z.ZodType, NavigatorResult> {
       }
     }
     return results;
+  }
+
+  /**
+   * Ensures that the agent's state always has a goal, even after navigation or script injection failures
+   * This prevents the "invalid_type" error for the required "goal" property
+   */
+  private async ensureStateHasGoal(): Promise<void> {
+    try {
+      // Get the latest messages to find if we have a valid goal
+      const messages = this.context.messageManager.getMessages();
+      let hasValidGoal = false;
+      let lastGoal: string | null = null;
+
+      // Look through messages to find the latest state
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const message = messages[i];
+        if (message.content && typeof message.content === 'string') {
+          const content = message.content;
+
+          // Try to extract the goal from the message
+          const nextGoalMatch = content.match(/"next_goal"\s*:\s*"([^"]+)"/);
+          if (nextGoalMatch && nextGoalMatch[1]) {
+            lastGoal = nextGoalMatch[1];
+            hasValidGoal = true;
+            break;
+          }
+        }
+      }
+
+      // If we don't have a valid goal, get it from the latest task
+      if (!hasValidGoal) {
+        // Get the tasks from message history - the most recent task is our goal
+        const taskMessages = this.context.messageManager
+          .getMessages()
+          .filter(
+            msg => msg.name === 'Human' && typeof msg.content === 'string' && !msg.content.includes('current_state'),
+          );
+        if (taskMessages.length > 0) {
+          // Extract task from last human message
+          const content = taskMessages[taskMessages.length - 1].content;
+          if (typeof content === 'string') {
+            lastGoal = content;
+            logger.info(`Retrieved goal from task history: ${lastGoal}`);
+          }
+        }
+      }
+
+      // If we still don't have a goal, use a generic one to prevent schema errors
+      if (!lastGoal) {
+        lastGoal = 'Continue helping with the current task';
+        logger.info('Using fallback goal to prevent schema errors');
+      }
+
+      // Ensure our current state has this goal by adding a proper state message
+      const stateObject = {
+        current_state: {
+          page_summary: 'Current page content',
+          evaluation_previous_goal: 'Continuing with the task',
+          memory: 'Task memory is preserved',
+          next_goal: lastGoal,
+        },
+      };
+
+      // If state message was added and we need to ensure goal, update it
+      if (this.context.stateMessageAdded) {
+        logger.info(`Ensuring goal is preserved in agent state: ${lastGoal}`);
+
+        // Create a state object with the preserved goal
+        await this.addStateMessageToMemory(stateObject);
+      }
+
+      if (this.context.stateMessageAdded && lastGoal) {
+        logger.info(`Ensuring goal is preserved in agent state: ${lastGoal}`);
+
+        // Create a state object with the preserved goal
+        const goalStateObj = {
+          current_state: {
+            page_summary: 'Current page content',
+            evaluation_previous_goal: 'Continuing with the task',
+            memory: 'Task memory is preserved',
+            next_goal: lastGoal,
+          },
+        };
+
+        // Add the state message with proper JSON formatting
+        await this.addStateMessageToMemory(goalStateObj);
+      }
+    } catch (error) {
+      logger.error('Error ensuring state has goal:', error);
+      // Don't throw, we want to continue even if this fails
+    }
   }
 }
