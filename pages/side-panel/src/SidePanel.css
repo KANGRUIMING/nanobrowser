@@ -1,6 +1,6 @@
 /* Add this at the top of the file */
 body {
-  border-color: rgb(159, 6, 11) !important; /* sky-200 color */
+  border-color: rgb(186, 230, 253) !important; /* sky-200 color */
 }
 
 /* Remove unused classes: .App, .App-logo, .App-header */
@@ -35,71 +35,192 @@ code {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem;
-  background-color: transparent;
-  border-bottom: 1px solid rgba(14, 165, 233, 0.2);
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(186, 230, 253, 0.5);
+  backdrop-filter: blur(8px);
+  background-color: rgba(255, 255, 255, 0.5);
 }
 
 .header-logo {
   display: flex;
   align-items: center;
+  gap: 0.5rem;
 }
 
 .header-icons {
   display: flex;
-  gap: 0.75rem;
   align-items: center;
+  gap: 0.75rem;
 }
 
 .header-icon {
-  color: #19C2FF;
   cursor: pointer;
-  transition: color 0.2s ease;
-  opacity: 0.8;
+  transition: all 0.2s;
 }
 
 .header-icon:hover {
-  color: #0073DC;
-  opacity: 1;
-}
-
-.send-button {
-  color: #19C2FF;
-  cursor: pointer;
-  transition: color 0.2s ease;
   opacity: 0.8;
 }
 
-.send-button:hover {
-  color: #0073DC;
-  opacity: 1;
+.chat-text {
+  white-space: pre-wrap;
 }
 
-.send-button:disabled {
-  color: #CBD5E1;
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-/* Add these styles to your existing CSS */
+/* Added tailwind class alternatives */
 .scrollbar-gutter-stable {
   scrollbar-gutter: stable;
 }
 
-/* Optional: Style the scrollbar for webkit browsers */
-.scrollbar-gutter-stable::-webkit-scrollbar {
-  width: 8px;
+@keyframes pulseAnimation {
+  0% {
+    box-shadow: 0 0 0 0 rgba(25, 194, 255, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(25, 194, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(25, 194, 255, 0);
+  }
 }
 
-.scrollbar-gutter-stable::-webkit-scrollbar-track {
-  background: #f1f5f9;  /* sky-50 */
+.chat-button-animation {
+  animation: pulseAnimation 2s infinite;
 }
 
-.scrollbar-gutter-stable::-webkit-scrollbar-thumb {
-  background: #7dd3fc;  /* sky-300 - very light blue */
-  border-radius: 4px;
+/* Custom select styling for cross-browser compatibility */
+select.custom-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2319C2FF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.25rem center;
+  background-size: 1em;
 }
 
-.scrollbar-gutter-stable::-webkit-scrollbar-thumb:hover {
-  background: #38bdf8;  /* sky-400 - slightly darker on hover */
+select.custom-select::-ms-expand {
+  display: none;
+}
+
+/* Job Application Agent UI Styles */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-image: url('/bg.jpg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  overflow: hidden;
+  border: 1px solid rgb(186, 230, 253);
+  border-radius: 1rem;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  background-color: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(186, 230, 253, 0.5);
+}
+
+.app-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+.app-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #19C2FF;
+  transition: color 0.2s;
+}
+
+.icon-button:hover {
+  color: #0073DC;
+}
+
+.icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.message-list-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  scroll-behavior: smooth;
+}
+
+.chat-history-container {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  height: 100%;
+}
+
+.back-button {
+  align-self: flex-start;
+  padding: 0.5rem 0;
+  color: #19C2FF;
+  margin-bottom: 1rem;
+}
+
+.history-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.template-container {
+  padding: 1rem;
+  border-top: 1px solid rgba(186, 230, 253, 0.5);
+  background-color: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(8px);
+}
+
+.template-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: #1e3a8a;
+}
+
+.app-footer {
+  display: flex;
+  justify-content: center;
+  padding: 0.75rem;
+  border-top: 1px solid rgba(186, 230, 253, 0.5);
+  background-color: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(8px);
+}
+
+.discord-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #5865F2;
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.discord-icon {
+  width: 1.25rem;
+  height: 1.25rem;
 }

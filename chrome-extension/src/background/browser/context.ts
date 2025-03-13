@@ -8,6 +8,8 @@ export default class BrowserContext {
   private readonly _config: BrowserContextConfig;
   private _currentTabId: number | null = null;
   private _attachedPages: Map<number, Page> = new Map();
+  private _stealthModeEnabled: boolean = false;
+  private _stealthLevel: 'low' | 'medium' | 'high' = 'medium';
 
   constructor(config: Partial<BrowserContextConfig>) {
     this._config = { ...DEFAULT_BROWSER_CONTEXT_CONFIG, ...config };
@@ -314,5 +316,33 @@ export default class BrowserContext {
     if (page) {
       await page.removeHighlight();
     }
+  }
+
+  /**
+   * Enable or disable stealth mode for anti-bot protection
+   * @param enabled Whether stealth mode should be enabled
+   * @param level Protection level (low, medium, high)
+   */
+  public setStealthMode(enabled: boolean, level: 'low' | 'medium' | 'high' = 'medium'): void {
+    this._stealthModeEnabled = enabled;
+    this._stealthLevel = level;
+
+    logger.info(`Stealth mode ${enabled ? 'enabled' : 'disabled'} with ${level} protection level`);
+
+    // Update all attached pages with new stealth settings
+    for (const page of this._attachedPages.values()) {
+      page.setStealthMode(enabled, level);
+    }
+  }
+
+  /**
+   * Get current stealth mode settings
+   * @returns Object containing stealth mode status and level
+   */
+  public getStealthMode(): { enabled: boolean; level: 'low' | 'medium' | 'high' } {
+    return {
+      enabled: this._stealthModeEnabled,
+      level: this._stealthLevel,
+    };
   }
 }

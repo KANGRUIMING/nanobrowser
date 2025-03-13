@@ -19,11 +19,14 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "react-icons": "^5.0.0",
-    "puppeteer-core": "24.1.1",
-    "webextension-polyfill": "^0.12.0",
     "@extension/shared": "workspace:*",
-    "@extension/storage": "workspace:*"
+    "@extension/storage": "workspace:*",
+    "pdfjs-dist": "^4.0.379",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-icons": "^4.11.0",
+    "puppeteer-core": "24.1.1",
+    "webextension-polyfill": "^0.12.0"
   },
   "devDependencies": {
     "@extension/tailwindcss-config": "workspace:*",

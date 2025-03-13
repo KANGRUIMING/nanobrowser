@@ -17,11 +17,12 @@ import {
   getScrollInfo as _getScrollInfo,
   getMarkdownContent as _getMarkdownContent,
   getReadabilityContent as _getReadabilityContent,
+  type ReadabilityResult,
 } from '../dom/service';
-import { DOMElementNode, type DOMState } from '../dom/views';
+import { DOMElementNode, type DOMState, DOMTextNode } from '../dom/views';
 import { type BrowserContextConfig, DEFAULT_BROWSER_CONTEXT_CONFIG, type PageState } from './types';
 import { createLogger } from '@src/background/log';
-import { use } from 'react/ts5.0';
+import { HumanInteraction } from './humanizer';
 
 const logger = createLogger('Page');
 
@@ -53,16 +54,23 @@ export function build_initial_state(tabId?: number, url?: string, title?: string
 
 export default class Page {
   private _tabId: number;
+  private _initialUrl: string;
+  private _initialTitle: string;
+  private _state: PageState;
+  private _validWebPage = false;
+  private _attached = false;
   private _browser: Browser | null = null;
   private _puppeteerPage: PuppeteerPage | null = null;
   private _config: BrowserContextConfig;
-  private _state: PageState;
-  private _validWebPage = false;
+  private _stealthModeEnabled: boolean = false;
+  private _stealthLevel: 'low' | 'medium' | 'high' = 'medium';
 
-  constructor(tabId: number, url: string, title: string, config: Partial<BrowserContextConfig> = {}) {
+  constructor(tabId: number, url: string, title: string, config: BrowserContextConfig) {
     this._tabId = tabId;
-    this._config = { ...DEFAULT_BROWSER_CONTEXT_CONFIG, ...config };
+    this._initialUrl = url;
+    this._initialTitle = title;
     this._state = build_initial_state(tabId, url, title);
+    this._config = config;
     // chrome://newtab/, chrome://newtab/extensions are not valid web pages, can't be attached
     this._validWebPage = (tabId && url && url.startsWith('http')) || false;
   }
@@ -111,25 +119,28 @@ export default class Page {
     }
 
     await this._puppeteerPage.evaluateOnNewDocument(`
-      // Webdriver property
+      // Webdriver property - Hide automation
       Object.defineProperty(navigator, 'webdriver', {
         get: () => undefined
       });
 
-      // Languages
-      // Object.defineProperty(navigator, 'languages', {
-      //   get: () => ['en-US']
-      // });
+      // Chrome runtime - Make Chrome detection pass
+      window.chrome = { 
+        runtime: {},
+        app: {},
+        loadTimes: function() {},
+        csi: function() {},
+        runtime: {
+          connect: function() {},
+          sendMessage: function() {},
+          onMessage: {
+            addListener: function() {},
+            removeListener: function() {}
+          }
+        }
+      };
 
-      // Plugins
-      // Object.defineProperty(navigator, 'plugins', {
-      //   get: () => [1, 2, 3, 4, 5]
-      // });
-
-      // Chrome runtime
-      window.chrome = { runtime: {} };
-
-      // Permissions
+      // Permissions - Make permission queries more natural
       const originalQuery = window.navigator.permissions.query;
       window.navigator.permissions.query = (parameters) => (
         parameters.name === 'notifications' ?
@@ -137,13 +148,112 @@ export default class Page {
           originalQuery(parameters)
       );
 
-      // Shadow DOM
+      // Prevent canvas fingerprinting from being too perfect by adding subtle noise
+      const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+      const originalGetImageData = CanvasRenderingContext2D.prototype.getImageData;
+      
+      // Add subtle noise to canvas fingerprinting
+      HTMLCanvasElement.prototype.toDataURL = function(type, quality) {
+        // Call the original function
+        const result = originalToDataURL.apply(this, arguments);
+        
+        // Only add noise to images larger than 16x16 (avoid breaking UI elements)
+        if (this.width > 16 && this.height > 16 && 
+            !this.getAttribute('data-noccanvas')) {
+          // Small chances of no modification to avoid breaking functionality
+          if (Math.random() < 0.92) {
+            return result;
+          }
+          
+          // Create a data URL with a slight modification
+          try {
+            const context = this.getContext('2d');
+            if (context) {
+              // Add one slightly modified pixel at a random location
+              const x = Math.floor(Math.random() * this.width);
+              const y = Math.floor(Math.random() * this.height);
+              const imgData = context.getImageData(x, y, 1, 1);
+              
+              // Add subtle noise to one random component
+              const component = Math.floor(Math.random() * 3);
+              imgData.data[component] = Math.max(0, Math.min(255, 
+                imgData.data[component] + (Math.random() < 0.5 ? 1 : -1)
+              ));
+              
+              context.putImageData(imgData, x, y);
+              return originalToDataURL.apply(this, arguments);
+            }
+          } catch (e) {
+            // If modification fails, return original
+            console.error("Error modifying canvas data", e);
+          }
+        }
+        
+        return result;
+      };
+
+      // Modified getImageData to add subtle random noise
+      CanvasRenderingContext2D.prototype.getImageData = function() {
+        const imageData = originalGetImageData.apply(this, arguments);
+        
+        // Only add noise in specific cases to avoid breaking UI
+        if (arguments[2] > 16 && arguments[3] > 16 && 
+            !this.canvas.getAttribute('data-nocanvas')) {
+          
+          // Small chance of modification to avoid breaking functionality
+          if (Math.random() < 0.92) {
+            return imageData;
+          }
+          
+          // Add slight variation to a few random pixels
+          const numPixelsToModify = Math.floor(Math.random() * 3) + 1;
+          
+          for (let i = 0; i < numPixelsToModify; i++) {
+            const pixelIndex = Math.floor(Math.random() * (imageData.data.length / 4)) * 4;
+            const component = Math.floor(Math.random() * 3);
+            
+            // Ensure modification is very subtle
+            imageData.data[pixelIndex + component] = Math.max(0, Math.min(255, 
+              imageData.data[pixelIndex + component] + (Math.random() < 0.5 ? 1 : -1)
+            ));
+          }
+        }
+        
+        return imageData;
+      };
+
+      // Make shadow DOM always accessible for content extraction
       (function () {
         const originalAttachShadow = Element.prototype.attachShadow;
         Element.prototype.attachShadow = function attachShadow(options) {
           return originalAttachShadow.call(this, { ...options, mode: "open" });
         };
       })();
+      
+      // Audio fingerprinting protection
+      const audioContextProto = window.AudioContext || window.webkitAudioContext;
+      if (audioContextProto) {
+        const origCreateOscillator = audioContextProto.prototype.createOscillator;
+        audioContextProto.prototype.createOscillator = function() {
+          const oscillator = origCreateOscillator.apply(this, arguments);
+          const origGetFrequency = oscillator.frequency.value;
+          Object.defineProperty(oscillator.frequency, 'value', {
+            get: function() { 
+              return origGetFrequency + (Math.random() * 0.0001);
+            }
+          });
+          return oscillator;
+        };
+      }
+      
+      // Override navigator properties with realistic values
+      if (!window.navigator.originalUserAgent) {
+        // Store original values
+        window.navigator.originalUserAgent = window.navigator.userAgent;
+        window.navigator.originalAppVersion = window.navigator.appVersion;
+        window.navigator.originalPlatform = window.navigator.platform;
+        window.navigator.originalVendor = window.navigator.vendor;
+      }
     `);
   }
 
@@ -199,9 +309,38 @@ export default class Page {
 
   async getReadabilityContent(): Promise<ReadabilityResult> {
     if (!this._validWebPage) {
-      return '';
+      return {
+        title: this._initialTitle || 'Invalid Page',
+        content: 'This page cannot be parsed for content',
+        textContent: 'This page cannot be parsed for content',
+        length: 0,
+        excerpt: 'Invalid page - cannot parse content',
+        byline: '',
+        dir: '',
+        siteName: '',
+        lang: '',
+        publishedTime: '',
+      };
     }
-    return _getReadabilityContent(this._tabId);
+
+    try {
+      return await _getReadabilityContent(this._tabId);
+    } catch (error) {
+      logger.error('Could not get readability content', error);
+      // Return a default ReadabilityResult object instead of a string
+      return {
+        title: this._initialTitle || 'Error',
+        content: `Error extracting content: ${error instanceof Error ? error.message : String(error)}`,
+        textContent: `Error extracting content: ${error instanceof Error ? error.message : String(error)}`,
+        length: 0,
+        excerpt: 'Error extracting content',
+        byline: '',
+        dir: '',
+        siteName: '',
+        lang: '',
+        publishedTime: '',
+      };
+    }
   }
 
   async getState(): Promise<PageState> {
@@ -404,20 +543,32 @@ export default class Page {
 
   async scrollDown(amount?: number): Promise<void> {
     if (this._puppeteerPage) {
-      if (amount) {
-        await this._puppeteerPage?.evaluate(`window.scrollBy(0, ${amount});`);
-      } else {
-        await this._puppeteerPage?.evaluate('window.scrollBy(0, window.innerHeight);');
+      // Use human-like scrolling behavior
+      await HumanInteraction.humanScroll(this._puppeteerPage, 'down', {
+        distance: amount,
+        speed: amount ? 'medium' : 'slow',
+        smooth: true,
+      });
+
+      // Add occasional random behavior after scrolling
+      if (Math.random() < 0.3) {
+        await HumanInteraction.addRandomBehavior(this._puppeteerPage);
       }
     }
   }
 
   async scrollUp(amount?: number): Promise<void> {
     if (this._puppeteerPage) {
-      if (amount) {
-        await this._puppeteerPage?.evaluate(`window.scrollBy(0, -${amount});`);
-      } else {
-        await this._puppeteerPage?.evaluate('window.scrollBy(0, -window.innerHeight);');
+      // Use human-like scrolling behavior
+      await HumanInteraction.humanScroll(this._puppeteerPage, 'up', {
+        distance: amount,
+        speed: amount ? 'medium' : 'slow',
+        smooth: true,
+      });
+
+      // Add occasional random behavior after scrolling
+      if (Math.random() < 0.3) {
+        await HumanInteraction.addRandomBehavior(this._puppeteerPage);
       }
     }
   }
@@ -429,33 +580,55 @@ export default class Page {
 
     // Split combination keys (e.g., "Control+A" or "Shift+ArrowLeft")
     const keyParts = keys.split('+');
-    const modifiers = keyParts.slice(0, -1);
-    const mainKey = keyParts[keyParts.length - 1];
 
-    // Press modifiers and main key, ensure modifiers are released even if an error occurs.
-    try {
-      // Press all modifier keys (e.g., Control, Shift, etc.)
-      for (const modifier of modifiers) {
-        await this._puppeteerPage.keyboard.down(this._convertKey(modifier));
-      }
-      // Press the main key
-      // also wait for stable state
-      await Promise.all([
-        this._puppeteerPage.keyboard.press(this._convertKey(mainKey)),
-        this.waitForPageAndFramesLoad(),
-      ]);
-      logger.info('sendKeys complete', keys);
-    } catch (error) {
-      logger.error('Failed to send keys:', error);
-      throw new Error(`Failed to send keys: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      // Release all modifier keys in reverse order regardless of any errors in key press.
-      for (const modifier of [...modifiers].reverse()) {
-        try {
-          await this._puppeteerPage.keyboard.up(this._convertKey(modifier));
-        } catch (releaseError) {
-          logger.error('Failed to release modifier:', modifier, releaseError);
+    if (keyParts.length === 1) {
+      // For single keys, add natural timing
+      try {
+        // Occasionally add random behavior before key press
+        if (Math.random() < 0.2) {
+          await HumanInteraction.addRandomBehavior(this._puppeteerPage);
         }
+
+        await HumanInteraction.randomDelay(50, 300);
+        await this._puppeteerPage.keyboard.press(this._convertKey(keyParts[0]));
+        await HumanInteraction.randomDelay(20, 200);
+
+        logger.info('sendKeys complete', keys);
+      } catch (error) {
+        logger.error('Failed to send keys:', error);
+        throw new Error(`Failed to send keys: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    } else {
+      // For key combinations, use the original implementation but with human-like delays
+      const modifiers = keyParts.slice(0, -1);
+      const mainKey = keyParts[keyParts.length - 1];
+
+      try {
+        // Add random delay before key combination
+        await HumanInteraction.randomDelay(100, 400);
+
+        // Press all modifier keys with small delays in between
+        for (const modifier of modifiers) {
+          await this._puppeteerPage.keyboard.down(this._convertKey(modifier));
+          await HumanInteraction.randomDelay(20, 100);
+        }
+
+        // Press the main key
+        await this._puppeteerPage.keyboard.press(this._convertKey(mainKey));
+        await HumanInteraction.randomDelay(50, 150);
+
+        // Release all modifier keys in reverse order
+        for (const modifier of [...modifiers].reverse()) {
+          await this._puppeteerPage.keyboard.up(this._convertKey(modifier));
+          await HumanInteraction.randomDelay(10, 50);
+        }
+
+        // Wait for any potential reactions to the key press
+        await this.waitForPageAndFramesLoad();
+        logger.info('sendKeys complete', keys);
+      } catch (error) {
+        logger.error('Failed to send keys:', error);
+        throw new Error(`Failed to send keys: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   }
@@ -736,35 +909,146 @@ export default class Page {
     }
 
     try {
-      // Highlight before typing
+      // Highlight before typing - this must be done first to update the DOM state
       if (elementNode.highlightIndex !== undefined) {
-        await this._updateState(useVision, elementNode.highlightIndex);
+        try {
+          await this._updateState(useVision, elementNode.highlightIndex);
+        } catch (stateUpdateError) {
+          console.warn('Failed to update DOM state, continuing with input:', stateUpdateError);
+          // Continue with input operation even if highlighting fails
+        }
       }
 
-      const element = await this.locateElement(elementNode);
+      // Apply stealth behavior after updating the DOM state
+      if (this._stealthModeEnabled) {
+        await this.applyStealthBehavior();
+      }
+
+      // First try standard element location
+      let element = await this.locateElement(elementNode);
+
+      // If element not found using standard methods, try fallback approaches
       if (!element) {
-        throw new Error(`Element: ${elementNode} not found`);
+        console.log('Input element not found with standard locator, trying fallback methods...');
+
+        // Try various fallback methods to locate the element
+        element = await this._fallbackElementLocation(elementNode);
+
+        if (!element) {
+          throw new Error(
+            `Input element: ${elementNode.tagName} (${elementNode.xpath}) not found after fallback attempts`,
+          );
+        }
       }
 
       // Scroll element into view if needed
-      await this._scrollIntoViewIfNeeded(element);
+      try {
+        await this._scrollIntoViewIfNeeded(element);
+      } catch (scrollError) {
+        console.warn('Failed to scroll element into view:', scrollError);
+        // Continue anyway
+      }
 
-      // Clear the input field (equivalent to fill(''))
-      await element.evaluate(el => {
-        if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-          el.value = '';
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-          el.dispatchEvent(new Event('change', { bubbles: true }));
+      // Handle clicks and typing differently based on stealth mode
+      try {
+        if (this._stealthModeEnabled) {
+          // Click the element with human-like movement first
+          await HumanInteraction.humanMouseClick(this._puppeteerPage, element);
+
+          // Clear the input field
+          await element.evaluate(el => {
+            if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+              el.value = '';
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          });
+
+          // Type with human-like timing and occasional mistakes
+          // Increase mistake probability in high stealth mode
+          const mistakeProbability = this._stealthModeEnabled && this._stealthLevel === 'high' ? 0.07 : 0.03;
+          await HumanInteraction.humanType(this._puppeteerPage, text, { mistakeProbability });
+        } else {
+          // Original method for typing (more reliable)
+          // Clear the input field first
+          await element.evaluate(el => {
+            if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+              el.value = '';
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          });
+
+          // Type the text directly
+          await element.type(text);
         }
-      });
+      } catch (typingError) {
+        console.warn('Standard typing methods failed, trying fallback typing:', typingError);
 
-      // Type the text
-      await element.type(text);
-      // Wait for stable state ?
+        // Try alternative typing methods
+        try {
+          // First alternative: Focus and type directly
+          await element.focus();
+          await this._puppeteerPage.keyboard.type(text);
+        } catch (focusTypeError) {
+          console.warn('Focus and type failed, trying JS typing:', focusTypeError);
+
+          // Second alternative: Try JavaScript typing
+          await element.evaluate((el, inputText) => {
+            if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+              // Set value and trigger events
+              el.value = inputText;
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }, text);
+        }
+      }
+
+      // Wait for potential auto-suggestions or dynamic content to load
+      await HumanInteraction.randomDelay(300, 800);
     } catch (error) {
-      throw new Error(
-        `Failed to input text into element: ${elementNode}. Error: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      console.error('All input methods failed, trying direct DOM manipulation:', error);
+
+      // Last resort: Try direct DOM manipulation using xpath
+      if (elementNode.xpath && elementNode.xpath.length > 0) {
+        try {
+          await this._puppeteerPage.evaluate(
+            (xpath, inputText) => {
+              try {
+                // Find element by xpath
+                const getElementByXPath = (path: string) => {
+                  const result = document.evaluate(path, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+                  return result.singleNodeValue;
+                };
+
+                const element = getElementByXPath(xpath);
+
+                // Set value if it's an input or textarea
+                if (element && (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) {
+                  element.value = inputText;
+                  element.dispatchEvent(new Event('input', { bubbles: true }));
+                  element.dispatchEvent(new Event('change', { bubbles: true }));
+                  return true;
+                }
+
+                return false;
+              } catch (e) {
+                console.error('Error in direct DOM input:', e);
+                return false;
+              }
+            },
+            elementNode.xpath,
+            text,
+          );
+        } catch (finalError) {
+          throw new Error(`All input attempts failed: ${error}`);
+        }
+      } else {
+        throw new Error(
+          `Failed to input text into element: ${elementNode.tagName}. Error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
   }
 
@@ -824,40 +1108,297 @@ export default class Page {
     }
 
     try {
-      // Highlight before clicking
+      // Highlight before clicking - this must be done first to update the DOM state
       if (elementNode.highlightIndex !== undefined) {
-        await this._updateState(useVision, elementNode.highlightIndex);
-      }
-
-      const element = await this.locateElement(elementNode);
-      if (!element) {
-        throw new Error(`Element: ${elementNode} not found`);
-      }
-
-      // Scroll element into view if needed
-      await this._scrollIntoViewIfNeeded(element);
-
-      try {
-        // First attempt: Use Puppeteer's click method with timeout
-        await Promise.race([
-          element.click(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Click timeout')), 2000)),
-        ]);
-      } catch (error) {
-        // Second attempt: Use evaluate to perform a direct click
-        logger.info('Failed to click element, trying again', error);
         try {
-          await element.evaluate(el => (el as HTMLElement).click());
-        } catch (secondError) {
-          throw new Error(
-            `Failed to click element: ${secondError instanceof Error ? secondError.message : String(secondError)}`,
-          );
+          await this._updateState(useVision, elementNode.highlightIndex);
+        } catch (stateUpdateError) {
+          console.warn('Failed to update DOM state, continuing with click:', stateUpdateError);
+          // Continue with click operation even if highlighting fails
+        }
+      }
+
+      // Apply stealth behavior after updating the DOM state
+      if (this._stealthModeEnabled) {
+        await this.applyStealthBehavior();
+      }
+
+      // First try standard element location
+      let element = await this.locateElement(elementNode);
+
+      // If element not found using standard methods, try fallback approaches
+      if (!element) {
+        console.log('Element not found with standard locator, trying fallback methods...');
+
+        // Try various fallback methods to locate the element
+        element = await this._fallbackElementLocation(elementNode);
+
+        if (!element) {
+          throw new Error(`Element: ${elementNode.tagName} (${elementNode.xpath}) not found after fallback attempts`);
+        }
+      }
+
+      // Add random human-like behavior before clicking (only if stealth mode enabled)
+      if (this._stealthModeEnabled && Math.random() < 0.7) {
+        await HumanInteraction.addRandomBehavior(this._puppeteerPage);
+      }
+
+      // Use human-like mouse movement and clicking if stealth mode is enabled,
+      // otherwise fall back to the original more reliable click method
+      if (this._stealthModeEnabled) {
+        await HumanInteraction.humanMouseClick(this._puppeteerPage, element);
+      } else {
+        // Original clicking method
+        try {
+          // First attempt: Use Puppeteer's click method with timeout
+          await Promise.race([
+            element.click(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Click timeout')), 2000)),
+          ]);
+        } catch (clickError) {
+          console.warn('Standard click failed, trying alternative click methods:', clickError);
+
+          try {
+            // Second attempt: Try scrolling into view first
+            await this._scrollIntoViewIfNeeded(element);
+            await element.click();
+          } catch (scrollClickError) {
+            console.warn('Scroll and click failed, trying click via JS:', scrollClickError);
+
+            try {
+              // Third attempt: Use JavaScript click as last resort
+              await this._puppeteerPage.evaluate(el => {
+                el.click();
+              }, element);
+            } catch (jsClickError) {
+              // Final attempt: Try a direct DOM click using coordinates
+              const box = await element.boundingBox();
+              if (box) {
+                await this._puppeteerPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+              } else {
+                throw new Error('Failed to click element: No bounding box available');
+              }
+            }
+          }
         }
       }
     } catch (error) {
-      throw new Error(
-        `Failed to click element: ${elementNode}. Error: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      console.error('Error clicking element:', error);
+
+      // Try one last direct approach if everything else fails
+      if (elementNode.xpath && elementNode.xpath.length > 0) {
+        try {
+          // Attempt to click by using direct DOM access via xpath or element properties
+          await this._puppeteerPage.evaluate(xpath => {
+            try {
+              const getElementByXPath = (path: string) => {
+                const result = document.evaluate(path, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+                return result.singleNodeValue;
+              };
+
+              // Try to find by xpath
+              let element = getElementByXPath(xpath);
+
+              // If not found and the xpath has an ID, try using getElementById
+              if (!element && xpath.includes('id=')) {
+                const idMatch = xpath.match(/id=["']([^"']*)["']/);
+                if (idMatch && idMatch[1]) {
+                  element = document.getElementById(idMatch[1]);
+                }
+              }
+
+              // If element found, click it
+              if (element) {
+                // Use dispatchEvent for more universal compatibility
+                const clickEvent = new MouseEvent('click', {
+                  bubbles: true,
+                  cancelable: true,
+                  view: window,
+                });
+                element.dispatchEvent(clickEvent);
+                return true;
+              }
+
+              return false;
+            } catch (e) {
+              console.error('Error in click evaluation:', e);
+              return false;
+            }
+          }, elementNode.xpath);
+        } catch (lastAttemptError) {
+          throw new Error(`All click attempts failed: ${error}`);
+        }
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Attempts to locate an element using alternative methods when standard location fails
+   * This is particularly useful for sites that block script injection
+   */
+  private async _fallbackElementLocation(elementNode: DOMElementNode): Promise<ElementHandle | null> {
+    console.log('Using fallback element location methods...');
+
+    try {
+      // Try 1: Use standard Puppeteer selectors if we have reliable attributes
+      if (elementNode.attributes && elementNode.attributes.id) {
+        // ID is most reliable
+        const idSelector = `#${CSS.escape(elementNode.attributes.id)}`;
+        try {
+          const element = await this._puppeteerPage!.$(idSelector);
+          if (element) {
+            console.log(`Found element by ID: ${idSelector}`);
+            return element;
+          }
+        } catch (idError) {
+          console.warn(`Failed to find element by ID: ${idError}`);
+        }
+      }
+
+      // Try 2: If we have coordinates, use them to find the element
+      if (
+        elementNode.viewportCoordinates &&
+        elementNode.viewportCoordinates.center &&
+        elementNode.viewportCoordinates.center.x !== undefined &&
+        elementNode.viewportCoordinates.center.y !== undefined
+      ) {
+        try {
+          // Use coordinates to find element
+          const x = elementNode.viewportCoordinates.center.x;
+          const y = elementNode.viewportCoordinates.center.y;
+
+          // Get element at position using JavaScript
+          const elementAtPoint = await this._puppeteerPage!.evaluateHandle(
+            (x, y) => {
+              const element = document.elementFromPoint(x, y);
+              return element;
+            },
+            x,
+            y,
+          );
+
+          if (elementAtPoint) {
+            const asElement = elementAtPoint.asElement();
+            if (asElement) {
+              console.log(`Found element at coordinates (${x}, ${y})`);
+              return asElement;
+            }
+          }
+        } catch (coordError) {
+          console.warn(`Failed to find element by coordinates: ${coordError}`);
+        }
+      }
+
+      // Try 3: Use a combination of tag name, attributes, and text content
+      if (elementNode.tagName) {
+        try {
+          // Create an array of possible attributes to match
+          const attrSelectors: string[] = [];
+
+          if (elementNode.attributes) {
+            // Add class selector if available
+            if (elementNode.attributes.class) {
+              const classNames = elementNode.attributes.class
+                .split(/\s+/)
+                .filter(c => c && !c.includes(':'))
+                .map(c => `.${CSS.escape(c)}`)
+                .join('');
+              if (classNames) {
+                attrSelectors.push(`${elementNode.tagName}${classNames}`);
+              }
+            }
+
+            // Add name attribute if available
+            if (elementNode.attributes.name) {
+              attrSelectors.push(`${elementNode.tagName}[name="${CSS.escape(elementNode.attributes.name)}"]`);
+            }
+
+            // Add other useful attributes
+            const usefulAttrs = ['type', 'role', 'aria-label', 'placeholder', 'href', 'title'];
+            for (const attr of usefulAttrs) {
+              if (elementNode.attributes[attr]) {
+                attrSelectors.push(`${elementNode.tagName}[${attr}="${CSS.escape(elementNode.attributes[attr])}"]`);
+              }
+            }
+          }
+
+          // Add generic tagname as last resort
+          attrSelectors.push(elementNode.tagName);
+
+          // Try each selector
+          for (const selector of attrSelectors) {
+            try {
+              const elements = await this._puppeteerPage!.$$(selector);
+
+              // If we have text content, use it to find the right element
+              if (elements.length > 0 && elementNode.children && elementNode.children.length > 0) {
+                // Get text from first text node child
+                const textNodes = elementNode.children.filter(child => child instanceof DOMTextNode);
+                if (textNodes.length > 0) {
+                  const targetText = (textNodes[0] as DOMTextNode).text.trim();
+
+                  if (targetText) {
+                    // Find element with matching text
+                    for (const element of elements) {
+                      const elementText = await this._puppeteerPage!.evaluate(
+                        el => el.textContent?.trim() || '',
+                        element,
+                      );
+                      if (elementText.includes(targetText) || targetText.includes(elementText)) {
+                        console.log(`Found element by selector "${selector}" and matching text: "${targetText}"`);
+                        return element;
+                      }
+                    }
+                  }
+                }
+              }
+
+              // If no text match, just return the first element
+              if (elements.length > 0) {
+                console.log(`Found element by selector: ${selector}`);
+                return elements[0];
+              }
+            } catch (selectorError) {
+              console.warn(`Failed to find element by selector "${selector}": ${selectorError}`);
+            }
+          }
+        } catch (tagError) {
+          console.warn(`Failed to find element by tag combinations: ${tagError}`);
+        }
+      }
+
+      // Try 4: Use XPath as last resort
+      if (elementNode.xpath) {
+        try {
+          // Format XPath for Puppeteer
+          const formattedXPath = elementNode.xpath.startsWith('//')
+            ? elementNode.xpath
+            : `//${elementNode.xpath.replace(/^\/+/, '')}`;
+
+          // Use the document.evaluate method directly via evaluate
+          const element = await this._puppeteerPage!.evaluateHandle(xpath => {
+            const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+            return result.singleNodeValue;
+          }, formattedXPath);
+
+          if (element) {
+            const asElement = element.asElement();
+            if (asElement) {
+              console.log(`Found element by XPath: ${formattedXPath}`);
+              return asElement;
+            }
+          }
+        } catch (xpathError) {
+          console.warn(`Failed to find element by XPath: ${xpathError}`);
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('All fallback location methods failed:', error);
+      return null;
     }
   }
 
@@ -1103,6 +1644,435 @@ export default class Page {
     // Sleep remaining time if needed
     if (remaining > 0) {
       await new Promise(resolve => setTimeout(resolve, remaining * 1000)); // Convert seconds to milliseconds
+    }
+  }
+
+  async waitForNetworkStable(): Promise<void> {
+    if (!this._puppeteerPage) {
+      throw new Error('Puppeteer page is not connected');
+    }
+
+    // Add additional wait time for stealth mode
+    const additionalDelay = this._stealthModeEnabled
+      ? this._stealthLevel === 'high'
+        ? 1.5
+        : this._stealthLevel === 'medium'
+          ? 1.0
+          : 0.5
+      : 0;
+
+    const RELEVANT_RESOURCE_TYPES = new Set(['document', 'stylesheet', 'image', 'font', 'script', 'iframe']);
+
+    const RELEVANT_CONTENT_TYPES = new Set([
+      'text/html',
+      'text/css',
+      'application/javascript',
+      'image/',
+      'font/',
+      'application/json',
+    ]);
+
+    const IGNORED_URL_PATTERNS = new Set([
+      // Analytics and tracking
+      'analytics',
+      'tracking',
+      'telemetry',
+      'beacon',
+      'metrics',
+      // Ad-related
+      'doubleclick',
+      'adsystem',
+      'adserver',
+      'advertising',
+      // Social media widgets
+      'facebook.com/plugins',
+      'platform.twitter',
+      'linkedin.com/embed',
+      // Live chat and support
+      'livechat',
+      'zendesk',
+      'intercom',
+      'crisp.chat',
+      'hotjar',
+      // Push notifications
+      'push-notifications',
+      'onesignal',
+      'pushwoosh',
+      // Background sync/heartbeat
+      'heartbeat',
+      'ping',
+      'alive',
+      // WebRTC and streaming
+      'webrtc',
+      'rtmp://',
+      'wss://',
+      // Common CDNs
+      'cloudfront.net',
+      'fastly.net',
+    ]);
+
+    const pendingRequests = new Set();
+    let lastActivity = Date.now();
+    let documentComplete = false;
+
+    // Flag to track if load event has fired
+    let loadFired = false;
+
+    // Set up load event listener
+    const loadListener = () => {
+      loadFired = true;
+      lastActivity = Date.now();
+    };
+
+    try {
+      // Listen for the load event
+      this._puppeteerPage.once('load', loadListener);
+
+      const onRequest = (request: HTTPRequest) => {
+        // Filter by resource type
+        const resourceType = request.resourceType();
+        if (!RELEVANT_RESOURCE_TYPES.has(resourceType)) {
+          return;
+        }
+
+        // Special handling for document resources
+        if (resourceType === 'document') {
+          documentComplete = false;
+        }
+
+        // Filter out streaming, websocket, and other real-time requests
+        if (['websocket', 'media', 'eventsource', 'manifest', 'other'].includes(resourceType)) {
+          return;
+        }
+
+        // Filter out by URL patterns
+        const url = request.url().toLowerCase();
+        if (Array.from(IGNORED_URL_PATTERNS).some(pattern => url.includes(pattern))) {
+          return;
+        }
+
+        // Filter out data URLs and blob URLs
+        if (url.startsWith('data:') || url.startsWith('blob:')) {
+          return;
+        }
+
+        // Filter out requests with certain headers
+        const headers = request.headers();
+        if (
+          // biome-ignore lint/complexity/useLiteralKeys: <explanation>
+          headers['purpose'] === 'prefetch' ||
+          headers['sec-fetch-dest'] === 'video' ||
+          headers['sec-fetch-dest'] === 'audio'
+        ) {
+          return;
+        }
+
+        pendingRequests.add(request);
+        lastActivity = Date.now();
+      };
+
+      const onResponse = (response: HTTPResponse) => {
+        const request = response.request();
+        if (!pendingRequests.has(request)) {
+          return;
+        }
+
+        // Mark document as complete when main document finishes loading
+        if (request.resourceType() === 'document') {
+          documentComplete = true;
+        }
+
+        // Filter by content type
+        const contentType = response.headers()['content-type']?.toLowerCase() || '';
+
+        // Skip streaming content
+        if (
+          ['streaming', 'video', 'audio', 'webm', 'mp4', 'event-stream', 'websocket', 'protobuf'].some(t =>
+            contentType.includes(t),
+          )
+        ) {
+          pendingRequests.delete(request);
+          return;
+        }
+
+        // Only process relevant content types
+        if (!Array.from(RELEVANT_CONTENT_TYPES).some(ct => contentType.includes(ct))) {
+          pendingRequests.delete(request);
+          return;
+        }
+
+        // Skip large responses
+        const contentLength = response.headers()['content-length'];
+        if (contentLength && Number.parseInt(contentLength) > 5 * 1024 * 1024) {
+          // 5MB
+          pendingRequests.delete(request);
+          return;
+        }
+
+        pendingRequests.delete(request);
+        lastActivity = Date.now();
+      };
+
+      // Add event listeners
+      this._puppeteerPage.on('request', onRequest);
+      this._puppeteerPage.on('response', onResponse);
+
+      try {
+        const startTime = Date.now();
+        const waitTimeWithStealth = this._config.waitForNetworkIdlePageLoadTime + additionalDelay;
+
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          // In stealth mode, use random delay intervals to appear more human-like
+          const interval = this._stealthModeEnabled ? 50 + Math.floor(Math.random() * 100) : 100;
+
+          await new Promise(resolve => setTimeout(resolve, interval));
+
+          const now = Date.now();
+          const timeSinceLastActivity = (now - lastActivity) / 1000; // Convert to seconds
+          const elapsedTime = (now - startTime) / 1000; // Convert to seconds
+
+          // Consider network stable when all of these conditions are true:
+          // 1. No pending requests OR adequate time since last activity
+          // 2. Document is complete (for main document navigations)
+          // 3. Load event has fired or adequate time has passed
+          const isStable =
+            (pendingRequests.size === 0 || timeSinceLastActivity >= waitTimeWithStealth) &&
+            (documentComplete || elapsedTime > waitTimeWithStealth / 2) &&
+            (loadFired || elapsedTime > waitTimeWithStealth);
+
+          if (isStable) {
+            // Add a small final delay when in stealth mode to mimic human attention span
+            if (this._stealthModeEnabled) {
+              const humanDelay =
+                this._stealthLevel === 'high'
+                  ? Math.floor(Math.random() * 1000) + 500
+                  : this._stealthLevel === 'medium'
+                    ? Math.floor(Math.random() * 500) + 200
+                    : Math.floor(Math.random() * 300) + 100;
+              await new Promise(resolve => setTimeout(resolve, humanDelay));
+            }
+            break;
+          }
+
+          if (elapsedTime > this._config.maximumWaitPageLoadTime + additionalDelay) {
+            console.debug(
+              `Network timeout after ${this._config.maximumWaitPageLoadTime + additionalDelay}s with ${pendingRequests.size} pending requests:`,
+              Array.from(pendingRequests).map(r => (r as HTTPRequest).url()),
+            );
+            break;
+          }
+        }
+      } finally {
+        // Clean up event listeners
+        this._puppeteerPage.off('request', onRequest);
+        this._puppeteerPage.off('response', onResponse);
+        this._puppeteerPage.off('load', loadListener);
+      }
+      console.debug(`Network stabilized for ${this._config.waitForNetworkIdlePageLoadTime + additionalDelay} seconds`);
+    } catch (error) {
+      console.error('Error waiting for network to stabilize:', error);
+      // Don't throw, just continue as we don't want this to break the flow
+    }
+  }
+
+  /**
+   * Enable or disable stealth mode for more human-like interactions
+   * @param enabled Whether stealth mode should be enabled
+   * @param level Protection level (low, medium, high)
+   */
+  public setStealthMode(enabled: boolean, level: 'low' | 'medium' | 'high' = 'medium'): void {
+    this._stealthModeEnabled = enabled;
+    this._stealthLevel = level;
+    logger.info(`Page ${this._tabId}: Stealth mode ${enabled ? 'enabled' : 'disabled'} with ${level} protection level`);
+  }
+
+  /**
+   * Get current stealth mode settings
+   */
+  public getStealthMode(): { enabled: boolean; level: 'low' | 'medium' | 'high' } {
+    return {
+      enabled: this._stealthModeEnabled,
+      level: this._stealthLevel,
+    };
+  }
+
+  /**
+   * Apply random delays and behaviors based on current stealth settings
+   */
+  private async applyStealthBehavior(): Promise<void> {
+    if (!this._stealthModeEnabled || !this._puppeteerPage) return;
+
+    // Apply different behaviors based on stealth level
+    switch (this._stealthLevel) {
+      case 'low':
+        // Just add a random delay
+        await HumanInteraction.randomDelay(200, 800);
+        break;
+
+      case 'medium':
+        // Add random delay and sometimes random mouse movement
+        await HumanInteraction.randomDelay(300, 1200);
+        if (Math.random() < 0.5) {
+          await HumanInteraction.addRandomBehavior(this._puppeteerPage);
+        }
+        break;
+
+      case 'high':
+        // Add longer random delay and more complex behaviors
+        await HumanInteraction.randomDelay(500, 2000);
+        await HumanInteraction.addRandomBehavior(this._puppeteerPage);
+
+        // Sometimes add a second random behavior
+        if (Math.random() < 0.3) {
+          await HumanInteraction.randomDelay(100, 500);
+          await HumanInteraction.addRandomBehavior(this._puppeteerPage);
+        }
+        break;
+    }
+  }
+
+  /**
+   * Scrolls to the specified element
+   * @param elementNode Element to scroll to
+   */
+  async scrollToElement(elementNode: DOMElementNode): Promise<void> {
+    if (!this._puppeteerPage) {
+      throw new Error('Puppeteer page is not connected');
+    }
+
+    if (!elementNode) {
+      throw new Error('Element is null or undefined');
+    }
+
+    // Get appropriate selector from the DOM element node
+    const selector = elementNode.xpath;
+    if (!selector) {
+      throw new Error('No valid xpath found for element');
+    }
+
+    try {
+      const element = await this._puppeteerPage.$(selector);
+
+      if (!element) {
+        throw new Error(`Element not found with selector "${selector}"`);
+      }
+
+      // If stealth mode is enabled, use human-like scrolling
+      if (this._stealthModeEnabled) {
+        // Get element position
+        const boundingBox = await element.boundingBox();
+        if (!boundingBox) {
+          throw new Error('Could not get element bounding box');
+        }
+
+        // Get viewport information
+        const viewportInfo = await this._puppeteerPage.evaluate(() => {
+          return {
+            height: window.innerHeight,
+            scrollY: window.scrollY,
+          };
+        });
+
+        // Calculate target position (element should be in viewport, but not at the very top)
+        const targetY = boundingBox.y - viewportInfo.height * 0.3; // Position element at 30% from top of viewport
+        const currentY = viewportInfo.scrollY;
+        const distance = targetY - currentY;
+
+        if (Math.abs(distance) < 50) {
+          // Element is already nearly in view, just small adjustment
+          await this._puppeteerPage.evaluate(y => {
+            window.scrollTo({
+              top: y,
+              behavior: 'smooth',
+            });
+          }, targetY);
+
+          // Small random delay
+          await HumanInteraction.randomDelay(200, 500);
+          return;
+        }
+
+        // Determine scroll direction and approximate number of scroll actions needed
+        const direction = distance > 0 ? 'down' : 'up';
+        const viewportHeight = viewportInfo.height;
+        const scrollsNeeded = Math.ceil(Math.abs(distance) / (viewportHeight * 0.7));
+
+        // Perform multiple scroll actions to reach the element
+        for (let i = 0; i < scrollsNeeded; i++) {
+          await HumanInteraction.humanScroll(this._puppeteerPage, direction, {
+            distance: Math.min(500, Math.abs(distance) / scrollsNeeded),
+            speed: this._stealthLevel === 'high' ? 'slow' : 'medium',
+            smooth: true,
+          });
+
+          // Check if element is now visible after each scroll
+          const isVisible = await this._puppeteerPage.evaluate(sel => {
+            const el = document.evaluate(
+              sel,
+              document,
+              null,
+              XPathResult.FIRST_ORDERED_NODE_TYPE,
+              null,
+            ).singleNodeValue;
+            if (!el) return false;
+
+            const rect = (el as Element).getBoundingClientRect();
+            return rect.top >= 0 && rect.top <= window.innerHeight;
+          }, selector);
+
+          if (isVisible) break;
+        }
+
+        // Fine tune the scroll position to center the element
+        await element.evaluate(el => {
+          el.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'center',
+          });
+        });
+
+        // Extra delay after scrolling to simulate reading or looking for the element
+        const readingDelay =
+          this._stealthLevel === 'high'
+            ? Math.floor(Math.random() * 2000) + 1000
+            : this._stealthLevel === 'medium'
+              ? Math.floor(Math.random() * 1000) + 500
+              : Math.floor(Math.random() * 500) + 200;
+
+        await HumanInteraction.randomDelay(readingDelay, readingDelay + 300);
+      } else {
+        // Without stealth mode, just scroll element into view
+        await element.evaluate(el => {
+          el.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'center',
+          });
+        });
+      }
+    } catch (error) {
+      console.error(
+        `Error scrolling to element with selector "${selector}"`,
+        error instanceof Error ? error.message : String(error),
+      );
+      // Try the direct JavaScript approach as a fallback
+      try {
+        await this._puppeteerPage.evaluate(sel => {
+          const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+          if (el) {
+            (el as Element).scrollIntoView({
+              block: 'center',
+              inline: 'center',
+              behavior: 'smooth',
+            });
+          }
+        }, selector);
+      } catch (fallbackError) {
+        console.error('Fallback scroll also failed:', fallbackError);
+        throw new Error(`Failed to scroll to element: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
   }
 }

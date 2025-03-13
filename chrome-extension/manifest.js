@@ -38,8 +38,15 @@ const manifest = withSidePanel({
    */
   name: '__MSG_extensionName__',
   version: packageJson.version,
-  description: '__MSG_extensionDescription__',
-  host_permissions: ['<all_urls>'],
+  description: 'An AI agent that helps you apply to jobs quickly and efficiently.',
+  host_permissions: [
+    'https://*.linkedin.com/*',
+    'https://www.indeed.com/*',
+    'https://www.glassdoor.com/*',
+    'https://www.simplyhired.com/*',
+    'https://www.monster.com/*',
+    'https://www.ziprecruiter.com/*',
+  ],
   permissions: ['storage', 'scripting', 'tabs', 'activeTab', 'debugger'],
   options_page: 'options/index.html',
   background: {

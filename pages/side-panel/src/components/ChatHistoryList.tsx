@@ -9,12 +9,12 @@ interface ChatSession {
 
 interface ChatHistoryListProps {
   sessions: ChatSession[];
-  onSessionSelect: (sessionId: string) => void;
-  onSessionDelete: (sessionId: string) => void;
-  visible: boolean;
+  onSelect: (sessionId: string) => void;
+  onDelete: (sessionId: string) => void;
+  visible?: boolean;
 }
 
-const ChatHistoryList: React.FC<ChatHistoryListProps> = ({ sessions, onSessionSelect, onSessionDelete, visible }) => {
+const ChatHistoryList: React.FC<ChatHistoryListProps> = ({ sessions, onSelect, onDelete, visible = true }) => {
   if (!visible) return null;
 
   const formatDate = (timestamp: number) => {
@@ -60,13 +60,13 @@ const ChatHistoryList: React.FC<ChatHistoryListProps> = ({ sessions, onSessionSe
                 <button
                   type="button"
                   className="flex-1 min-w-0 cursor-pointer text-left"
-                  onClick={() => onSessionSelect(session.id)}>
+                  onClick={() => onSelect(session.id)}>
                   <p className="text-sm font-medium text-gray-900 truncate">{session.title}</p>
                   <p className="text-xs text-gray-500 mt-1">{formatDate(session.createdAt)}</p>
                 </button>
                 <button
                   type="button"
-                  onClick={() => onSessionDelete(session.id)}
+                  onClick={() => onDelete(session.id)}
                   className="ml-3 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                   aria-label="Delete chat session">
                   <FaTrash size={14} />

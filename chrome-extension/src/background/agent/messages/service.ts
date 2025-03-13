@@ -11,6 +11,7 @@ export default class MessageManager {
   private readonly IMG_TOKENS: number;
   private sensitiveData?: Record<string, string>;
   private toolId: number;
+  private pageHistory: Array<{ url: string; title: string; summary: string; timestamp: number }> = [];
 
   constructor({
     maxInputTokens = 128000,
@@ -41,6 +42,15 @@ export default class MessageManager {
         content: `Context for the task: ${messageContext}`,
       });
       this.addMessageWithTokens(contextMessage);
+    }
+
+    // Add page history as context if available
+    const pageHistoryContext = this.getPageHistoryContext();
+    if (pageHistoryContext) {
+      const pageHistoryMessage = new HumanMessage({
+        content: `Previous browsing history: ${pageHistoryContext}`,
+      });
+      this.addMessageWithTokens(pageHistoryMessage);
     }
 
     // Add task instructions
@@ -384,5 +394,59 @@ export default class MessageManager {
     }
 
     return mergedMessages;
+  }
+
+  /**
+   * Adds a visited page to the page history
+   * @param url - The URL of the page
+   * @param title - The title of the page
+   * @param summary - A summary of the page content
+   */
+  public addPageToHistory(url: string, title: string, summary: string): void {
+    // Don't add duplicate URLs in sequence
+    if (this.pageHistory.length > 0 && this.pageHistory[this.pageHistory.length - 1].url === url) {
+      return;
+    }
+
+    this.pageHistory.push({
+      url,
+      title,
+      summary,
+      timestamp: Date.now(),
+    });
+
+    // If we have more than 10 pages, keep only the most recent ones
+    if (this.pageHistory.length > 10) {
+      this.pageHistory = this.pageHistory.slice(-10);
+    }
+  }
+
+  /**
+   * Get formatted page history for context
+   */
+  public getPageHistoryContext(): string {
+    if (this.pageHistory.length === 0) {
+      return '';
+    }
+
+    const formattedHistory = this.pageHistory
+      .map((page, index) => {
+        return `Page ${index + 1}: ${page.title} (${page.url})
+Summary: ${page.summary}`;
+      })
+      .join('\n\n');
+
+    return `
+BROWSING HISTORY:
+${formattedHistory}
+`;
+  }
+
+  /**
+   * Get raw page history data
+   * @returns Array of page history objects
+   */
+  public getPageHistoryRaw(): Array<{ url: string; title: string; summary: string; timestamp: number }> {
+    return [...this.pageHistory];
   }
 }

@@ -7,6 +7,7 @@ import { GrHistory } from 'react-icons/gr';
 import { type Message, Actors, chatHistoryStore } from '@extension/storage';
 import MessageList from './components/MessageList';
 import ChatInput from './components/ChatInput';
+import JobApplicationInput from './components/JobApplicationInput';
 import ChatHistoryList from './components/ChatHistoryList';
 import TemplateList from './components/TemplateList';
 import { EventType, type AgentEvent, ExecutionState } from './types/event';
@@ -22,6 +23,8 @@ const SidePanel = () => {
   const [chatSessions, setChatSessions] = useState<Array<{ id: string; title: string; createdAt: number }>>([]);
   const [isFollowUpMode, setIsFollowUpMode] = useState(false);
   const [isHistoricalSession, setIsHistoricalSession] = useState(false);
+  const [currentResumeData, setCurrentResumeData] = useState<any>(null);
+  const [currentJobKeywords, setCurrentJobKeywords] = useState<string[]>([]);
   const sessionIdRef = useRef<string | null>(null);
   const portRef = useRef<chrome.runtime.Port | null>(null);
   const heartbeatIntervalRef = useRef<number | null>(null);
@@ -288,6 +291,96 @@ const SidePanel = () => {
     [stopConnection],
   );
 
+  const handleJobApplicationSubmit = async (resumeData: any, keywords: string[]) => {
+    if (!resumeData || keywords.length === 0) return;
+
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tabId = tabs[0]?.id;
+      if (!tabId) {
+        throw new Error('No active tab found');
+      }
+
+      setInputEnabled(false);
+      setShowStopButton(true);
+
+      // Store the resume data and keywords
+      setCurrentResumeData(resumeData);
+      setCurrentJobKeywords(keywords);
+
+      // Create a default task message based on keywords
+      const taskMessage = `Find and apply to jobs matching these keywords: ${keywords.join(', ')}`;
+
+      // Create a new chat session for this task
+      const newSession = await chatHistoryStore.createSession(
+        `Job Search: ${keywords.join(', ')}`.substring(0, 50) + (keywords.join(', ').length > 30 ? '...' : ''),
+      );
+
+      // Store the session ID in both state and ref
+      const sessionId = newSession.id;
+      setCurrentSessionId(sessionId);
+      sessionIdRef.current = sessionId;
+
+      const userMessage = {
+        actor: Actors.USER,
+        content: taskMessage,
+        timestamp: Date.now(),
+      };
+
+      // Pass the sessionId directly to appendMessage
+      appendMessage(userMessage, sessionIdRef.current);
+
+      // Setup connection if not exists
+      if (!portRef.current) {
+        setupConnection();
+      }
+
+      // Convert PDF content to text for LLM prompt if necessary
+      // The PDF was loaded as an ArrayBuffer and marked with isPdf flag
+      let processedResumeData = resumeData;
+
+      if (resumeData.isPdf) {
+        // For PDF files, we convert the fileName and estimated size info
+        // This indicates to the backend that the resume is a PDF
+        // and should be treated as a text representation
+        processedResumeData = {
+          resumeText: `PDF Resume: ${resumeData.fileName} (approximately ${resumeData.estimatedWords} words)`,
+          originalFormat: 'PDF',
+        };
+
+        // Add a message to indicate to the user that only the text content will be used
+        appendMessage({
+          actor: Actors.SYSTEM,
+          content: 'Your PDF resume has been processed. Only the text content will be used to fill job applications.',
+          timestamp: Date.now(),
+        });
+      }
+
+      // Send message with resume data and job keywords
+      await sendMessage({
+        type: 'new_task',
+        task: taskMessage,
+        taskId: sessionIdRef.current,
+        tabId,
+        resumeData: processedResumeData,
+        jobKeywords: keywords,
+      });
+
+      console.log('job_application task sent', taskMessage, tabId, sessionIdRef.current);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error('Task error', errorMessage);
+      appendMessage({
+        actor: Actors.SYSTEM,
+        content: errorMessage,
+        timestamp: Date.now(),
+      });
+      setInputEnabled(true);
+      setShowStopButton(false);
+      stopConnection();
+    }
+  };
+
   const handleSendMessage = async (text: string) => {
     console.log('handleSendMessage', text);
 
@@ -344,6 +437,8 @@ const SidePanel = () => {
           task: text,
           taskId: sessionIdRef.current,
           tabId,
+          resumeData: currentResumeData,
+          jobKeywords: currentJobKeywords,
         });
         console.log('follow_up_task sent', text, tabId, sessionIdRef.current);
       } else {
@@ -353,6 +448,8 @@ const SidePanel = () => {
           task: text,
           taskId: sessionIdRef.current,
           tabId,
+          resumeData: currentResumeData,
+          jobKeywords: currentJobKeywords,
         });
         console.log('new_task sent', text, tabId, sessionIdRef.current);
       }
@@ -389,17 +486,13 @@ const SidePanel = () => {
   };
 
   const handleNewChat = () => {
-    // Clear messages and start a new chat
     setMessages([]);
     setCurrentSessionId(null);
     sessionIdRef.current = null;
-    setInputEnabled(true);
-    setShowStopButton(false);
     setIsFollowUpMode(false);
     setIsHistoricalSession(false);
-
-    // Disconnect any existing connection
-    stopConnection();
+    setCurrentResumeData(null);
+    setCurrentJobKeywords([]);
   };
 
   const loadChatSessions = useCallback(async () => {
@@ -449,9 +542,24 @@ const SidePanel = () => {
   };
 
   const handleTemplateSelect = (content: string) => {
-    console.log('handleTemplateSelect', content);
     if (setInputTextRef.current) {
       setInputTextRef.current(content);
+    } else {
+      // For job application mode, populate the keywords field
+      const keywordsList = content
+        .split(',')
+        .map(k => k.trim())
+        .filter(k => k !== '');
+      setCurrentJobKeywords(keywordsList);
+
+      // Prompt the user to upload their resume if they haven't already
+      if (!currentResumeData) {
+        appendMessage({
+          actor: Actors.SYSTEM,
+          content: "I've set the job keywords for you. Please upload your resume to start the job search.",
+          timestamp: Date.now(),
+        });
+      }
     }
   };
 
@@ -469,112 +577,70 @@ const SidePanel = () => {
   }, [messages]);
 
   return (
-    <div>
-      <div className="flex flex-col h-[100vh] bg-[url('/bg.jpg')] bg-cover bg-no-repeat overflow-hidden border border-[rgb(186,230,253)] rounded-2xl">
-        <header className="header relative">
-          <div className="header-logo">
-            {showHistory ? (
-              <button
-                type="button"
-                onClick={handleBackToChat}
-                className="text-sky-400 hover:text-sky-500 cursor-pointer"
-                aria-label="Back to chat">
-                ← Back
-              </button>
-            ) : (
-              <img src="/icon-128.png" alt="Extension Logo" className="h-6 w-6" />
-            )}
-          </div>
-          <div className="header-icons">
-            {!showHistory && (
-              <>
-                <button
-                  type="button"
-                  onClick={handleNewChat}
-                  onKeyDown={e => e.key === 'Enter' && handleNewChat()}
-                  className="header-icon text-sky-400 hover:text-sky-500 cursor-pointer"
-                  aria-label="New Chat"
-                  tabIndex={0}>
-                  <PiPlusBold size={20} />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleLoadHistory}
-                  onKeyDown={e => e.key === 'Enter' && handleLoadHistory()}
-                  className="header-icon text-sky-400 hover:text-sky-500 cursor-pointer"
-                  aria-label="Load History"
-                  tabIndex={0}>
-                  <GrHistory size={20} />
-                </button>
-              </>
-            )}
-            <a
-              href="https://discord.gg/NN3ABHggMK"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="header-icon text-sky-400 hover:text-sky-500">
-              <RxDiscordLogo size={20} />
-            </a>
-            <button
-              type="button"
-              onClick={() => chrome.runtime.openOptionsPage()}
-              onKeyDown={e => e.key === 'Enter' && chrome.runtime.openOptionsPage()}
-              className="header-icon text-sky-400 hover:text-sky-500 cursor-pointer"
-              aria-label="Settings"
-              tabIndex={0}>
-              <FiSettings size={20} />
-            </button>
-          </div>
-        </header>
+    <div className="app-container">
+      <header className="app-header">
+        <div className="app-title">Job Application Agent</div>
+        <div className="app-actions">
+          <button className="icon-button" onClick={handleNewChat} title="New chat">
+            <PiPlusBold className="icon" />
+          </button>
+          <button className="icon-button" onClick={handleLoadHistory} title="View history">
+            <GrHistory className="icon" />
+          </button>
+          <button onClick={() => chrome.runtime.openOptionsPage()} className="icon-button" title="Settings">
+            <FiSettings className="icon" />
+          </button>
+        </div>
+      </header>
+
+      <main className="chat-container">
         {showHistory ? (
-          <div className="flex-1 overflow-hidden">
-            <ChatHistoryList
-              sessions={chatSessions}
-              onSessionSelect={handleSessionSelect}
-              onSessionDelete={handleSessionDelete}
-              visible={true}
-            />
+          <div className="chat-history-container">
+            <button className="back-button" onClick={handleBackToChat}>
+              &lt; Back to Chat
+            </button>
+            <h3 className="history-title">Chat History</h3>
+            <ChatHistoryList sessions={chatSessions} onSelect={handleSessionSelect} onDelete={handleSessionDelete} />
           </div>
         ) : (
           <>
-            {messages.length === 0 && (
-              <>
-                <div className="border-t border-sky-100 backdrop-blur-sm p-2 shadow-sm mb-2">
-                  <ChatInput
-                    onSendMessage={handleSendMessage}
-                    onStopTask={handleStopTask}
-                    disabled={!inputEnabled || isHistoricalSession}
-                    showStopButton={showStopButton}
-                    setContent={setter => {
-                      setInputTextRef.current = setter;
-                    }}
-                  />
-                </div>
-                <div>
-                  <TemplateList templates={defaultTemplates} onTemplateSelect={handleTemplateSelect} />
-                </div>
-              </>
-            )}
-            <div className="flex-1 overflow-y-scroll overflow-x-hidden scrollbar-gutter-stable p-4 scroll-smooth">
+            <div className="message-list-container" ref={messagesEndRef}>
               <MessageList messages={messages} />
-              <div ref={messagesEndRef} />
             </div>
-            {messages.length > 0 && (
-              <div className="border-t border-sky-100 backdrop-blur-sm p-2 shadow-sm">
-                <ChatInput
-                  onSendMessage={handleSendMessage}
-                  onStopTask={handleStopTask}
+
+            {!isFollowUpMode && !isHistoricalSession && messages.length === 0 ? (
+              // Show job application input for new sessions
+              <JobApplicationInput onSubmit={handleJobApplicationSubmit} disabled={!inputEnabled} />
+            ) : (
+              // Show regular chat input for follow-up messages or historical sessions
+              <ChatInput
+                onSendMessage={handleSendMessage}
+                onStopTask={handleStopTask}
+                disabled={!inputEnabled || isHistoricalSession}
+                showStopButton={showStopButton}
+                setContent={setter => {
+                  setInputTextRef.current = setter;
+                }}
+              />
+            )}
+
+            {messages.length === 0 && !showHistory && (
+              <div className="template-container">
+                <h3 className="template-title">Suggested Job Search Keywords</h3>
+                <TemplateList
+                  templates={defaultTemplates}
+                  onSelect={handleTemplateSelect}
                   disabled={!inputEnabled || isHistoricalSession}
-                  showStopButton={showStopButton}
-                  setContent={setter => {
-                    setInputTextRef.current = setter;
-                  }}
                 />
               </div>
             )}
           </>
         )}
-      </div>
+      </main>
+
+      <footer className="app-footer">
+        <div className="text-gray-500 text-sm">Job Application Agent</div>
+      </footer>
     </div>
   );
 };
