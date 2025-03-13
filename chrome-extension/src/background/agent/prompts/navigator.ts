@@ -50,6 +50,7 @@ export class NavigatorPrompt extends BasePrompt {
    - Elements marked with "[]Non-interactive text" are non-interactive (for context only)
 
 4. NAVIGATION & ERROR HANDLING:
+   - If you need to search on LinkedIn, use the search_linkedin action. Don't need to input the search query manually, just use the action.
    - If you need to search in Google, use the search_google action. Don't need to input the search query manually, just use the action.
    - If no suitable elements exist, use other functions to complete the task
    - If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.
@@ -76,6 +77,7 @@ export class NavigatorPrompt extends BasePrompt {
 
 7. Form filling:
    - If you fill an input field and your action sequence is interrupted, most often a list with suggestions popped up under the field and you need to first select the right element from the suggestion list.
+   - If you fill an input field and the field is already filled, check if the field is already filled with the correct information. If it is, skip the field and move on. If it is not, delete the existing information and fill the field with the correct information.
 
 8. ACTION SEQUENCING:
    - Actions are executed in the order they appear in the list
@@ -142,7 +144,7 @@ Notes:
      *
      * @returns SystemMessage containing the formatted system prompt
      */
-    const AGENT_PROMPT = `You are a precise browser automation agent that interacts with websites through structured commands. Your role is to:
+    const AGENT_PROMPT = `You are a precise browser automation agent that interacts with linkedin websites through structured commands. Your role is to:
 1. Analyze the provided webpage elements and structure
 2. Use the given information to accomplish the ultimate task
 3. Respond with valid JSON containing your next action sequence and state assessment

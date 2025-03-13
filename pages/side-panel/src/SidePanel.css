@@ -1,4 +1,3 @@
-/* Reset and base styles */
 
 body {
   margin: 0;
@@ -16,7 +15,7 @@ body {
   border: 1px solid rgba(255, 166, 82, 0.2);
 }
 
-/* Header styles */
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -24,6 +23,13 @@ body {
   padding: 16px 20px;
   background-color: white;
   border-bottom: 1px solid rgba(255, 166, 82, 0.2);
+}
+
+/* Dark mode header border */
+@media (prefers-color-scheme: dark) {
+  .header {
+    border-bottom: 1px solid rgba(14, 165, 233, 0.3);
+  }
 }
 
 .header-logo {
@@ -174,4 +180,34 @@ button[type="submit"]:hover {
 button[type="submit"]:disabled {
   background-color: rgba(255, 123, 0, 0.5) !important;
   cursor: not-allowed !important;
+}
+
+/* Dark mode scrollbar for scrollbar-gutter-stable */
+@media (prefers-color-scheme: dark) {
+  .scrollbar-gutter-stable::-webkit-scrollbar-track {
+    background: #1e293b;  /* slate-800 */
+  }
+  
+  .scrollbar-gutter-stable::-webkit-scrollbar-thumb {
+    background: #0ea5e9;  /* sky-500 */
+  }
+  
+  .scrollbar-gutter-stable::-webkit-scrollbar-thumb:hover {
+    background: #38bdf8;  /* sky-400 */
+  }
+}
+
+/* Dark mode text and background colors */
+@media (prefers-color-scheme: dark) {
+  .dark-mode-text {
+    color: #e2e8f0 !important; /* slate-200 */
+  }
+  
+  .dark-mode-bg {
+    background-color: #1e293b !important; /* slate-800 */
+  }
+  
+  .dark-mode-border {
+    border-color: #475569 !important; /* slate-600 */
+  }
 }

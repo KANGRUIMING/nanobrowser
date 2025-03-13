@@ -46,6 +46,16 @@ export const geminiNavigatorOutputSchema = {
             required: ['query'],
             nullable: true,
           },
+          search_linkedin: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+              },
+            },
+            required: ['query'],
+            nullable: true,
+          },
           go_to_url: {
             type: 'object',
             properties: {
