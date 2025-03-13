@@ -22,6 +22,7 @@ const SidePanel = () => {
   const [chatSessions, setChatSessions] = useState<Array<{ id: string; title: string; createdAt: number }>>([]);
   const [isFollowUpMode, setIsFollowUpMode] = useState(false);
   const [isHistoricalSession, setIsHistoricalSession] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
   const sessionIdRef = useRef<string | null>(null);
   const portRef = useRef<chrome.runtime.Port | null>(null);
   const heartbeatIntervalRef = useRef<number | null>(null);
@@ -455,6 +456,125 @@ const SidePanel = () => {
     }
   };
 
+  // Handle PDF upload
+  const handlePdfUpload = async (file: File) => {
+    try {
+      // Don't allow uploads in historical sessions
+      if (isHistoricalSession) {
+        console.log('Cannot upload files in historical sessions');
+        return;
+      }
+
+      setUploadingPdf(true);
+
+      // Get the active tab
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tabId = tabs[0]?.id;
+      if (!tabId) {
+        throw new Error('No active tab found');
+      }
+
+      // Create a new session if needed
+      if (!isFollowUpMode && !sessionIdRef.current) {
+        const newSession = await chatHistoryStore.createSession(`PDF Upload: ${file.name}`);
+        setCurrentSessionId(newSession.id);
+        sessionIdRef.current = newSession.id;
+      }
+
+      // Add a user message indicating PDF upload
+      const userMessage = {
+        actor: Actors.USER,
+        content: `Uploaded PDF: ${file.name}`,
+        timestamp: Date.now(),
+      };
+
+      appendMessage(userMessage, sessionIdRef.current);
+
+      // Setup connection if not exists
+      if (!portRef.current) {
+        setupConnection();
+      }
+
+      // Read file as base64
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64Content = reader.result?.toString().split(',')[1]; // Remove data URL prefix
+
+          if (!base64Content) {
+            throw new Error('Failed to read PDF file');
+          }
+
+          setInputEnabled(false);
+          setShowStopButton(true);
+
+          // Send PDF to background service worker
+          if (isFollowUpMode) {
+            // Send as follow-up with PDF
+            await sendMessage({
+              type: 'follow_up_task',
+              task: `Process this PDF: ${file.name}`,
+              taskId: sessionIdRef.current,
+              tabId,
+              pdfData: {
+                name: file.name,
+                content: base64Content,
+              },
+            });
+          } else {
+            // Send as new task with PDF
+            await sendMessage({
+              type: 'new_task',
+              task: `Process this PDF: ${file.name}`,
+              taskId: sessionIdRef.current,
+              tabId,
+              pdfData: {
+                name: file.name,
+                content: base64Content,
+              },
+            });
+          }
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          console.error('PDF upload error', errorMessage);
+          appendMessage({
+            actor: Actors.SYSTEM,
+            content: `Failed to process PDF: ${errorMessage}`,
+            timestamp: Date.now(),
+          });
+          setInputEnabled(true);
+          setShowStopButton(false);
+        } finally {
+          setUploadingPdf(false);
+        }
+      };
+
+      reader.onerror = () => {
+        appendMessage({
+          actor: Actors.SYSTEM,
+          content: 'Failed to read PDF file',
+          timestamp: Date.now(),
+        });
+        setUploadingPdf(false);
+        setInputEnabled(true);
+        setShowStopButton(false);
+      };
+
+      reader.readAsDataURL(file);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error('PDF upload error', errorMessage);
+      appendMessage({
+        actor: Actors.SYSTEM,
+        content: `Failed to upload PDF: ${errorMessage}`,
+        timestamp: Date.now(),
+      });
+      setUploadingPdf(false);
+      setInputEnabled(true);
+      setShowStopButton(false);
+    }
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -543,11 +663,13 @@ const SidePanel = () => {
                   <ChatInput
                     onSendMessage={handleSendMessage}
                     onStopTask={handleStopTask}
-                    disabled={!inputEnabled || isHistoricalSession}
+                    disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
                     showStopButton={showStopButton}
                     setContent={setter => {
                       setInputTextRef.current = setter;
                     }}
+                    onFileUpload={handlePdfUpload}
+                    isUploading={uploadingPdf}
                   />
                 </div>
                 <div>
@@ -564,11 +686,13 @@ const SidePanel = () => {
                 <ChatInput
                   onSendMessage={handleSendMessage}
                   onStopTask={handleStopTask}
-                  disabled={!inputEnabled || isHistoricalSession}
+                  disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
                   showStopButton={showStopButton}
                   setContent={setter => {
                     setInputTextRef.current = setter;
                   }}
+                  onFileUpload={handlePdfUpload}
+                  isUploading={uploadingPdf}
                 />
               </div>
             )}

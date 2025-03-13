@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { HiOutlineDocumentText } from 'react-icons/hi';
+import { AiOutlineLoading3Quarters } from 'react-icons/ai';
 
 interface ChatInputProps {
   onSendMessage: (text: string) => void;
@@ -6,11 +8,22 @@ interface ChatInputProps {
   disabled: boolean;
   showStopButton: boolean;
   setContent?: (setter: (text: string) => void) => void;
+  onFileUpload?: (file: File) => void;
+  isUploading?: boolean;
 }
 
-export default function ChatInput({ onSendMessage, onStopTask, disabled, showStopButton, setContent }: ChatInputProps) {
+export default function ChatInput({
+  onSendMessage,
+  onStopTask,
+  disabled,
+  showStopButton,
+  setContent,
+  onFileUpload,
+  isUploading = false,
+}: ChatInputProps) {
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Handle text changes and resize textarea
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -62,6 +75,19 @@ export default function ChatInput({ onSendMessage, onStopTask, disabled, showSto
     [handleSubmit],
   );
 
+  const handleFileButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0 && files[0].type === 'application/pdf' && onFileUpload) {
+      onFileUpload(files[0]);
+      // Reset the file input so the same file can be uploaded again if needed
+      e.target.value = '';
+    }
+  };
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -83,7 +109,31 @@ export default function ChatInput({ onSendMessage, onStopTask, disabled, showSto
         />
 
         <div className={`flex items-center justify-between px-3 py-1.5 ${disabled ? 'bg-gray-100' : 'bg-white'}`}>
-          <div className="flex gap-2 text-gray-500">{/* Icons can go here */}</div>
+          <div className="flex gap-2 text-gray-500">
+            {/* PDF upload button */}
+            <button
+              type="button"
+              onClick={handleFileButtonClick}
+              disabled={disabled || isUploading}
+              className="text-sky-400 hover:text-sky-500 disabled:opacity-50 disabled:hover:text-sky-400"
+              title={isUploading ? 'Uploading PDF...' : 'Upload PDF'}
+              aria-label={isUploading ? 'Uploading PDF...' : 'Upload PDF'}>
+              {isUploading ? (
+                <AiOutlineLoading3Quarters size={20} className="animate-spin" />
+              ) : (
+                <HiOutlineDocumentText size={20} />
+              )}
+            </button>
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf"
+              onChange={handleFileChange}
+              className="hidden"
+              disabled={disabled || isUploading}
+            />
+          </div>
 
           {showStopButton ? (
             <button
