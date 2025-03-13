@@ -96,7 +96,7 @@ export default function ChatInput({ onSendMessage, onStopTask, disabled, showSto
             <button
               type="submit"
               disabled={disabled}
-              className="px-3 py-1 bg-[#19C2FF] text-white rounded-md hover:bg-[#0073DC] transition-colors disabled:opacity-50">
+              className="px-3 py-1 bg-[#FF7B00] text-white rounded-md hover:bg-[#FF8D21] transition-colors disabled:opacity-50">
               Send
             </button>
           )}
