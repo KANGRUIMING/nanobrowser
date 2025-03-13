@@ -156,7 +156,7 @@ export default function ChatInput({
             <button
               type="submit"
               disabled={disabled}
-              className={`rounded-md bg-[#19C2FF] px-3 py-1 text-white transition-colors hover:bg-[#0073DC] ${disabled ? 'opacity-50' : ''}`}>
+              className="px-3 py-1 bg-[#FF7B00] text-white rounded-md hover:bg-[#FF8D21] transition-colors disabled:opacity-50">
               Send
             </button>
           )}
