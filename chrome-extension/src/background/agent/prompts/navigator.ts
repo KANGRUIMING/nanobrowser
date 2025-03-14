@@ -51,7 +51,6 @@ export class NavigatorPrompt extends BasePrompt {
 
 4. NAVIGATION & ERROR HANDLING:
    - If you need to search on LinkedIn, use the search_linkedin action. Don't need to input the search query manually, just use the action.
-   - If you need to search in Google, use the search_google action. Don't need to input the search query manually, just use the action.
    - If no suitable elements exist, use other functions to complete the task
    - If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.
    - Handle popups/cookies by accepting or closing them
