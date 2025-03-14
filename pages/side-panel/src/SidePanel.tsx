@@ -15,6 +15,7 @@ import './SidePanel.css';
 import { IoSettingsOutline } from 'react-icons/io5';
 import { VscHistory } from 'react-icons/vsc';
 import JobInput from './components/JobInput';
+import PdfUpload from './components/PdfUpload';
 
 const SidePanel = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -637,26 +638,30 @@ const SidePanel = () => {
               <>
                 <div
                   className={`border-t ${isDarkMode ? 'border-sky-900' : 'border-sky-100'} backdrop-blur-sm p-2 shadow-sm mb-2`}>
-                  <div className="mb-2">
+                  <div className="flex flex-col gap-2">
                     <JobInput
                       onJobTitleChange={handleJobTitleChange}
                       onSubmit={handleJobSubmit}
                       disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
                       isDarkMode={isDarkMode}
                     />
+                    <PdfUpload
+                      onFileUpload={handlePdfUpload}
+                      disabled={!inputEnabled || isHistoricalSession}
+                      isUploading={uploadingPdf}
+                      isDarkMode={isDarkMode}
+                    />
+                    <ChatInput
+                      onSendMessage={handleSendMessage}
+                      onStopTask={handleStopTask}
+                      disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
+                      showStopButton={showStopButton}
+                      setContent={setter => {
+                        setInputTextRef.current = setter;
+                      }}
+                      isDarkMode={isDarkMode}
+                    />
                   </div>
-                  <ChatInput
-                    onSendMessage={handleSendMessage}
-                    onStopTask={handleStopTask}
-                    disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
-                    showStopButton={showStopButton}
-                    setContent={setter => {
-                      setInputTextRef.current = setter;
-                    }}
-                    isDarkMode={isDarkMode}
-                    onFileUpload={handlePdfUpload}
-                    isUploading={uploadingPdf}
-                  />
                 </div>
                 <div>
                   <TemplateList
@@ -675,26 +680,30 @@ const SidePanel = () => {
             {messages.length > 0 && (
               <div
                 className={`border-t ${isDarkMode ? 'border-sky-900' : 'border-sky-100'} backdrop-blur-sm p-2 shadow-sm`}>
-                <div className="mb-2">
+                <div className="flex flex-col gap-2">
                   <JobInput
                     onJobTitleChange={handleJobTitleChange}
                     onSubmit={handleJobSubmit}
                     disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
                     isDarkMode={isDarkMode}
                   />
+                  <PdfUpload
+                    onFileUpload={handlePdfUpload}
+                    disabled={!inputEnabled || isHistoricalSession}
+                    isUploading={uploadingPdf}
+                    isDarkMode={isDarkMode}
+                  />
+                  <ChatInput
+                    onSendMessage={handleSendMessage}
+                    onStopTask={handleStopTask}
+                    disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
+                    showStopButton={showStopButton}
+                    setContent={setter => {
+                      setInputTextRef.current = setter;
+                    }}
+                    isDarkMode={isDarkMode}
+                  />
                 </div>
-                <ChatInput
-                  onSendMessage={handleSendMessage}
-                  onStopTask={handleStopTask}
-                  disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
-                  showStopButton={showStopButton}
-                  setContent={setter => {
-                    setInputTextRef.current = setter;
-                  }}
-                  isDarkMode={isDarkMode}
-                  onFileUpload={handlePdfUpload}
-                  isUploading={uploadingPdf}
-                />
               </div>
             )}
           </>
