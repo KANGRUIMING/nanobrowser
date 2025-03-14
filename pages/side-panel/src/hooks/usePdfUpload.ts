@@ -40,7 +40,6 @@ export const usePdfUpload = ({
   const handlePdfUpload = useCallback(
     async (file: File) => {
       try {
-        // Don't allow uploads in historical sessions
         if (isHistoricalSession) {
           console.log('Cannot upload files in historical sessions');
           return;
@@ -48,28 +47,11 @@ export const usePdfUpload = ({
 
         setUploadingPdf(true);
 
-        // Get the active tab
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
         const tabId = tabs[0]?.id;
         if (!tabId) {
           throw new Error('No active tab found');
         }
-
-        // Create a new session if needed
-        if (!isFollowUpMode && !sessionIdRef.current) {
-          const newSession = await chatHistoryStore.createSession(`PDF Upload: ${file.name}`);
-          setCurrentSessionId(newSession.id);
-          sessionIdRef.current = newSession.id;
-        }
-
-        // Add a user message indicating PDF upload
-        const userMessage = {
-          actor: Actors.USER,
-          content: `Uploaded PDF: ${file.name}`,
-          timestamp: Date.now(),
-        };
-
-        appendMessage(userMessage, sessionIdRef.current);
 
         // Setup connection if not exists
         if (!portRef.current) {
@@ -80,41 +62,27 @@ export const usePdfUpload = ({
         const reader = new FileReader();
         reader.onload = async () => {
           try {
-            const base64Content = reader.result?.toString().split(',')[1]; // Remove data URL prefix
+            const base64Content = reader.result?.toString().split(',')[1];
 
             if (!base64Content) {
               throw new Error('Failed to read PDF file');
             }
 
-            setInputEnabled(false);
-            setShowStopButton(true);
+            // Send PDF directly to background service worker
+            await sendMessage({
+              type: 'process_pdf',
+              pdfData: {
+                name: file.name,
+                content: base64Content,
+              },
+              tabId,
+            });
 
-            // Send PDF to background service worker
-            if (isFollowUpMode) {
-              // Send as follow-up with PDF
-              await sendMessage({
-                type: 'follow_up_task',
-                task: `Process this PDF: ${file.name}`,
-                taskId: sessionIdRef.current,
-                tabId,
-                pdfData: {
-                  name: file.name,
-                  content: base64Content,
-                },
-              });
-            } else {
-              // Send as new task with PDF
-              await sendMessage({
-                type: 'new_task',
-                task: `Process this PDF: ${file.name}`,
-                taskId: sessionIdRef.current,
-                tabId,
-                pdfData: {
-                  name: file.name,
-                  content: base64Content,
-                },
-              });
-            }
+            appendMessage({
+              actor: Actors.SYSTEM,
+              content: `Processing PDF: ${file.name}...`,
+              timestamp: Date.now(),
+            });
           } catch (err) {
             const errorMessage = err instanceof Error ? err.message : String(err);
             console.error('PDF upload error', errorMessage);
@@ -123,8 +91,6 @@ export const usePdfUpload = ({
               content: `Failed to process PDF: ${errorMessage}`,
               timestamp: Date.now(),
             });
-            setInputEnabled(true);
-            setShowStopButton(false);
           } finally {
             setUploadingPdf(false);
           }
@@ -137,8 +103,6 @@ export const usePdfUpload = ({
             timestamp: Date.now(),
           });
           setUploadingPdf(false);
-          setInputEnabled(true);
-          setShowStopButton(false);
         };
 
         reader.readAsDataURL(file);
@@ -151,22 +115,9 @@ export const usePdfUpload = ({
           timestamp: Date.now(),
         });
         setUploadingPdf(false);
-        setInputEnabled(true);
-        setShowStopButton(false);
       }
     },
-    [
-      isFollowUpMode,
-      isHistoricalSession,
-      sessionIdRef,
-      setupConnection,
-      sendMessage,
-      appendMessage,
-      portRef,
-      setInputEnabled,
-      setShowStopButton,
-      setCurrentSessionId,
-    ],
+    [isHistoricalSession, setupConnection, sendMessage, appendMessage, portRef],
   );
 
   return { uploadingPdf, handlePdfUpload };
