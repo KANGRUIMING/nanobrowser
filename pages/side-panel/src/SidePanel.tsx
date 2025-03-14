@@ -10,7 +10,6 @@ import ChatHistoryList from './components/ChatHistoryList';
 import { EventType, type AgentEvent, ExecutionState } from './types/event';
 import { defaultTemplates } from './templates';
 import TemplateList from './components/TemplateList';
-import { usePdfUpload } from './hooks/usePdfUpload';
 import './SidePanel.css';
 import { IoSettingsOutline } from 'react-icons/io5';
 import { VscHistory } from 'react-icons/vsc';
@@ -306,20 +305,6 @@ const SidePanel = () => {
     },
     [stopConnection],
   );
-
-  // Use the PDF upload hook
-  const { uploadingPdf, handlePdfUpload } = usePdfUpload({
-    isFollowUpMode,
-    isHistoricalSession,
-    sessionIdRef,
-    setupConnection,
-    sendMessage,
-    appendMessage,
-    portRef,
-    setInputEnabled,
-    setShowStopButton,
-    setCurrentSessionId,
-  });
 
   const handleSendMessage = async (text: string) => {
     console.log('handleSendMessage', text);
@@ -642,19 +627,13 @@ const SidePanel = () => {
                     <JobInput
                       onJobTitleChange={handleJobTitleChange}
                       onSubmit={handleJobSubmit}
-                      disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
-                      isDarkMode={isDarkMode}
-                    />
-                    <PdfUpload
-                      onFileUpload={handlePdfUpload}
                       disabled={!inputEnabled || isHistoricalSession}
-                      isUploading={uploadingPdf}
                       isDarkMode={isDarkMode}
                     />
                     <ChatInput
                       onSendMessage={handleSendMessage}
                       onStopTask={handleStopTask}
-                      disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
+                      disabled={!inputEnabled || isHistoricalSession}
                       showStopButton={showStopButton}
                       setContent={setter => {
                         setInputTextRef.current = setter;
@@ -684,19 +663,13 @@ const SidePanel = () => {
                   <JobInput
                     onJobTitleChange={handleJobTitleChange}
                     onSubmit={handleJobSubmit}
-                    disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
-                    isDarkMode={isDarkMode}
-                  />
-                  <PdfUpload
-                    onFileUpload={handlePdfUpload}
                     disabled={!inputEnabled || isHistoricalSession}
-                    isUploading={uploadingPdf}
                     isDarkMode={isDarkMode}
                   />
                   <ChatInput
                     onSendMessage={handleSendMessage}
                     onStopTask={handleStopTask}
-                    disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
+                    disabled={!inputEnabled || isHistoricalSession}
                     showStopButton={showStopButton}
                     setContent={setter => {
                       setInputTextRef.current = setter;
