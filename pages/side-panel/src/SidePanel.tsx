@@ -14,6 +14,7 @@ import { usePdfUpload } from './hooks/usePdfUpload';
 import './SidePanel.css';
 import { IoSettingsOutline } from 'react-icons/io5';
 import { VscHistory } from 'react-icons/vsc';
+import JobInput from './components/JobInput';
 
 const SidePanel = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -25,6 +26,7 @@ const SidePanel = () => {
   const [isFollowUpMode, setIsFollowUpMode] = useState(false);
   const [isHistoricalSession, setIsHistoricalSession] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [jobTitle, setJobTitle] = useState('');
   const sessionIdRef = useRef<string | null>(null);
   const portRef = useRef<chrome.runtime.Port | null>(null);
   const heartbeatIntervalRef = useRef<number | null>(null);
@@ -352,9 +354,12 @@ const SidePanel = () => {
         sessionIdRef.current = sessionId;
       }
 
+      // Include job title in the message if it exists
+      const messageWithContext = jobTitle.trim() ? `Using job title "${jobTitle}": ${text}` : text;
+
       const userMessage = {
         actor: Actors.USER,
-        content: text,
+        content: messageWithContext,
         timestamp: Date.now(),
       };
 
@@ -371,20 +376,20 @@ const SidePanel = () => {
         // Send as follow-up task
         await sendMessage({
           type: 'follow_up_task',
-          task: text,
+          task: messageWithContext,
           taskId: sessionIdRef.current,
           tabId,
         });
-        console.log('follow_up_task sent', text, tabId, sessionIdRef.current);
+        console.log('follow_up_task sent', messageWithContext, tabId, sessionIdRef.current);
       } else {
         // Send as new task
         await sendMessage({
           type: 'new_task',
-          task: text,
+          task: messageWithContext,
           taskId: sessionIdRef.current,
           tabId,
         });
-        console.log('new_task sent', text, tabId, sessionIdRef.current);
+        console.log('new_task sent', messageWithContext, tabId, sessionIdRef.current);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -482,6 +487,10 @@ const SidePanel = () => {
     handleSendMessage(template);
   };
 
+  const handleJobTitleChange = (text: string) => {
+    setJobTitle(text);
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -564,6 +573,13 @@ const SidePanel = () => {
               <>
                 <div
                   className={`border-t ${isDarkMode ? 'border-sky-900' : 'border-sky-100'} backdrop-blur-sm p-2 shadow-sm mb-2`}>
+                  <div className="mb-2">
+                    <JobInput
+                      onJobTitleChange={handleJobTitleChange}
+                      disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
+                      isDarkMode={isDarkMode}
+                    />
+                  </div>
                   <ChatInput
                     onSendMessage={handleSendMessage}
                     onStopTask={handleStopTask}
@@ -594,6 +610,13 @@ const SidePanel = () => {
             {messages.length > 0 && (
               <div
                 className={`border-t ${isDarkMode ? 'border-sky-900' : 'border-sky-100'} backdrop-blur-sm p-2 shadow-sm`}>
+                <div className="mb-2">
+                  <JobInput
+                    onJobTitleChange={handleJobTitleChange}
+                    disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
+                    isDarkMode={isDarkMode}
+                  />
+                </div>
                 <ChatInput
                   onSendMessage={handleSendMessage}
                   onStopTask={handleStopTask}
