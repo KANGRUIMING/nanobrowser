@@ -491,6 +491,70 @@ const SidePanel = () => {
     setJobTitle(text);
   };
 
+  const handleJobSubmit = async (text: string) => {
+    if (!text.trim()) return;
+
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tabId = tabs[0]?.id;
+      if (!tabId) {
+        throw new Error('No active tab found');
+      }
+
+      setInputEnabled(false);
+      setShowStopButton(true);
+
+      // Create a new chat session
+      const newSession = await chatHistoryStore.createSession(
+        `Job Search: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`,
+      );
+      console.log('newSession', newSession);
+
+      // Store the session ID in both state and ref
+      const sessionId = newSession.id;
+      setCurrentSessionId(sessionId);
+      sessionIdRef.current = sessionId;
+
+      // First navigate to LinkedIn search
+      const searchUrl = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(text)}`;
+      await chrome.tabs.update(tabId, { url: searchUrl });
+
+      // Add the initial message
+      const userMessage = {
+        actor: Actors.USER,
+        content: `Help me find and apply to jobs as a ${text}`,
+        timestamp: Date.now(),
+      };
+
+      // Pass the sessionId directly to appendMessage
+      appendMessage(userMessage, sessionIdRef.current);
+
+      // Setup connection if not exists
+      if (!portRef.current) {
+        setupConnection();
+      }
+
+      // Start the AI agent
+      await sendMessage({
+        type: 'new_task',
+        task: `Help me find and apply to jobs as a ${text}. Analyze the job listings on the page and help me identify suitable positions.`,
+        taskId: sessionIdRef.current,
+        tabId,
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error('Job search error', errorMessage);
+      appendMessage({
+        actor: Actors.SYSTEM,
+        content: errorMessage,
+        timestamp: Date.now(),
+      });
+      setInputEnabled(true);
+      setShowStopButton(false);
+      stopConnection();
+    }
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -576,6 +640,7 @@ const SidePanel = () => {
                   <div className="mb-2">
                     <JobInput
                       onJobTitleChange={handleJobTitleChange}
+                      onSubmit={handleJobSubmit}
                       disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
                       isDarkMode={isDarkMode}
                     />
@@ -613,6 +678,7 @@ const SidePanel = () => {
                 <div className="mb-2">
                   <JobInput
                     onJobTitleChange={handleJobTitleChange}
+                    onSubmit={handleJobSubmit}
                     disabled={!inputEnabled || isHistoricalSession || uploadingPdf}
                     isDarkMode={isDarkMode}
                   />

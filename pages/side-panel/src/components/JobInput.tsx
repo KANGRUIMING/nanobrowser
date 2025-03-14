@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 
 interface JobInputProps {
   onJobTitleChange: (text: string) => void;
+  onSubmit?: (text: string) => void;
   disabled?: boolean;
   isDarkMode?: boolean;
   placeholder?: string;
@@ -9,6 +10,7 @@ interface JobInputProps {
 
 export default function JobInput({
   onJobTitleChange,
+  onSubmit,
   disabled = false,
   isDarkMode = false,
   placeholder = 'Enter job title or position...',
@@ -22,6 +24,13 @@ export default function JobInput({
     onJobTitleChange(newText);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey && text.trim() && onSubmit) {
+      e.preventDefault();
+      onSubmit(text.trim());
+    }
+  };
+
   return (
     <div
       className={`overflow-hidden rounded-lg border transition-colors focus-within:border-sky-400 hover:border-sky-400 ${isDarkMode ? 'border-slate-700' : ''}`}>
@@ -30,6 +39,7 @@ export default function JobInput({
         type="text"
         value={text}
         onChange={handleTextChange}
+        onKeyDown={handleKeyDown}
         disabled={disabled}
         className={`w-full border-none p-3 focus:outline-none ${
           disabled
