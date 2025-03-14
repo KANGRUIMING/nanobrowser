@@ -5,6 +5,7 @@ import { Executor } from './agent/executor';
 import { createLogger } from './log';
 import { ExecutionState } from './agent/event/types';
 import { createChatModel } from './agent/helper';
+import { SupabaseService } from '../lib/services/supabase.service';
 
 const logger = createLogger('background');
 
@@ -72,6 +73,19 @@ chrome.tabs.onRemoved.addListener(tabId => {
 });
 
 logger.info('background loaded');
+
+// Add this function to test Supabase connection
+async function testSupabaseConnection() {
+  try {
+    const pdfFiles = await SupabaseService.getPdfFiles();
+    logger.info('Successfully connected to Supabase:', pdfFiles);
+  } catch (error) {
+    logger.error('Failed to connect to Supabase:', error);
+  }
+}
+
+// Test connection when background script loads
+testSupabaseConnection();
 
 // Setup connection listener
 chrome.runtime.onConnect.addListener(port => {
@@ -144,11 +158,18 @@ chrome.runtime.onConnect.addListener(port => {
             await currentExecutor.pause();
             return port.postMessage({ type: 'success' });
           }
+
+          case 'save_pdf': {
+            const pdfData = await SupabaseService.insertPdfFile(message.data);
+            port.postMessage({ type: 'pdf_saved', data: pdfData });
+            break;
+          }
+
           default:
             return port.postMessage({ type: 'error', error: 'Unknown message type' });
         }
       } catch (error) {
-        console.error('Error handling port message:', error);
+        logger.error('Error handling port message:', error);
         port.postMessage({
           type: 'error',
           error: error instanceof Error ? error.message : 'Unknown error',

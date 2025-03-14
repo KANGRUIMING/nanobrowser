@@ -39,8 +39,8 @@ const manifest = withSidePanel({
   name: '__MSG_extensionName__',
   version: packageJson.version,
   description: '__MSG_extensionDescription__',
-  host_permissions: ['*://*.linkedin.com/*'],
-  permissions: ['storage', 'scripting', 'tabs', 'activeTab', 'debugger'],
+  host_permissions: ['*://*.linkedin.com/*', 'https://wuszvpgeaivovcguytdj.supabase.co/*'],
+  permissions: ['storage', 'scripting', 'tabs', 'activeTab', 'debugger', 'identity'],
   options_page: 'options/index.html',
   background: {
     service_worker: 'background.iife.js',
@@ -61,7 +61,7 @@ const manifest = withSidePanel({
   web_accessible_resources: [
     {
       resources: ['*.js', '*.css', '*.svg', 'icon-128.png', 'icon-32.png'],
-      matches: ['*://*/*'],
+      matches: ['*://*/*', 'https://wuszvpgeaivovcguytdj.supabase.co/*'],
     },
   ],
 });
