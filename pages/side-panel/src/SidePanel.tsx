@@ -15,6 +15,13 @@ import { IoSettingsOutline } from 'react-icons/io5';
 import { VscHistory } from 'react-icons/vsc';
 import JobInput from './components/JobInput';
 import PdfUpload from './components/PdfUpload';
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase client
+const supabaseUrl = 'https://wuszvpgeaivovcguytdj.supabase.co';
+const supabaseAnonKey =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1c3p2cGdlYWl2b3ZjZ3V5dGRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5Nzg0MDEsImV4cCI6MjA1NzU1NDQwMX0.tUXk9MkKwkgjZPpd4Yur--dXiwuEOiz0Pf_SvJh0IyM';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const SidePanel = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -32,6 +39,7 @@ const SidePanel = () => {
   const heartbeatIntervalRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const setInputTextRef = useRef<((text: string) => void) | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
   // Check for dark mode preference
   useEffect(() => {
@@ -541,6 +549,27 @@ const SidePanel = () => {
     }
   };
 
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    setUploadedFile(file);
+    if (file) {
+      console.log('File selected:', file.name);
+
+      try {
+        // Upload file to Supabase storage
+        const { data, error } = await supabase.storage.from('your-bucket-name').upload(`uploads/${file.name}`, file);
+
+        if (error) {
+          throw error;
+        }
+
+        console.log('File uploaded successfully:', data);
+      } catch (error) {
+        console.error('Error uploading file:', error);
+      }
+    }
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -640,6 +669,7 @@ const SidePanel = () => {
                       }}
                       isDarkMode={isDarkMode}
                     />
+                    <input type="file" onChange={handleFileChange} className="file-input" aria-label="Upload File" />
                   </div>
                 </div>
                 <div>
