@@ -9,15 +9,11 @@ import ChatInput from './components/ChatInput';
 import ChatHistoryList from './components/ChatHistoryList';
 import { EventType, type AgentEvent, ExecutionState } from './types/event';
 import { defaultTemplates } from './templates';
+import TemplateList from './components/TemplateList';
 import { usePdfUpload } from './hooks/usePdfUpload';
 import './SidePanel.css';
 import { IoSettingsOutline } from 'react-icons/io5';
 import { VscHistory } from 'react-icons/vsc';
-import { useNavigate } from 'react-router-dom';
-import { useAtom } from 'jotai';
-import { useTranslation } from 'react-i18next';
-import { Message, sendMessage as sendMessageToBackground, stopConnection } from './utils';
-import { historyAtom } from './store';
 
 const SidePanel = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -482,6 +478,10 @@ const SidePanel = () => {
     }
   };
 
+  const handleTemplateSelect = (template: string) => {
+    handleSendMessage(template);
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -560,7 +560,6 @@ const SidePanel = () => {
           </div>
         ) : (
           <>
-
             {messages.length === 0 && (
               <>
                 <div
