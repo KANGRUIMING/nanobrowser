@@ -20,7 +20,7 @@ interface UsePdfUploadOptions {
 
 interface UsePdfUploadResult {
   uploadingPdf: boolean;
-  handlePdfUpload: (file: File) => Promise<void>;
+  handlePdfUpload: (fileOrPath: File | string) => Promise<void>;
 }
 
 export const usePdfUpload = ({
@@ -37,8 +37,24 @@ export const usePdfUpload = ({
 }: UsePdfUploadOptions): UsePdfUploadResult => {
   const [uploadingPdf, setUploadingPdf] = useState(false);
 
+  const readFileAsBase64 = useCallback(async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64Content = reader.result?.toString().split(',')[1];
+        if (base64Content) {
+          resolve(base64Content);
+        } else {
+          reject(new Error('Failed to read file as base64'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
   const handlePdfUpload = useCallback(
-    async (file: File) => {
+    async (fileOrPath: File | string) => {
       try {
         if (isHistoricalSession) {
           console.log('Cannot upload files in historical sessions');
@@ -58,54 +74,59 @@ export const usePdfUpload = ({
           setupConnection();
         }
 
-        // Read file as base64
-        const reader = new FileReader();
-        reader.onload = async () => {
+        let file: File;
+        let fileName: string;
+
+        if (typeof fileOrPath === 'string') {
           try {
-            const base64Content = reader.result?.toString().split(',')[1];
-
-            if (!base64Content) {
-              throw new Error('Failed to read PDF file');
-            }
-
-            // Send PDF directly to background service worker
-            await sendMessage({
-              type: 'process_pdf',
-              pdfData: {
-                name: file.name,
-                content: base64Content,
-              },
-              tabId,
-            });
-
-            appendMessage({
-              actor: Actors.SYSTEM,
-              content: `Processing PDF: ${file.name}...`,
-              timestamp: Date.now(),
-            });
-          } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : String(err);
-            console.error('PDF upload error', errorMessage);
-            appendMessage({
-              actor: Actors.SYSTEM,
-              content: `Failed to process PDF: ${errorMessage}`,
-              timestamp: Date.now(),
-            });
-          } finally {
-            setUploadingPdf(false);
+            console.log('Processing PDF from file path:', fileOrPath);
+            const response = await fetch(`file://${fileOrPath}`);
+            const blob = await response.blob();
+            fileName = fileOrPath.split(/[\\/]/).pop() || 'document.pdf';
+            file = new File([blob], fileName, { type: 'application/pdf' });
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to read file from path: ${errorMessage}`);
           }
-        };
+        } else {
+          file = fileOrPath;
+          fileName = file.name;
+          // For File objects, we can try to get the path if available
+          console.log('Processing PDF from File object:', {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            lastModified: new Date(file.lastModified).toISOString(),
+          });
+        }
 
-        reader.onerror = () => {
+        try {
+          const base64Content = await readFileAsBase64(file);
+
+          // Send PDF directly to background service worker
+          await sendMessage({
+            type: 'process_pdf',
+            pdfData: {
+              name: fileName,
+              content: base64Content,
+            },
+            tabId,
+          });
+
           appendMessage({
             actor: Actors.SYSTEM,
-            content: 'Failed to read PDF file',
+            content: `Processing PDF: ${fileName}...`,
             timestamp: Date.now(),
           });
-          setUploadingPdf(false);
-        };
-
-        reader.readAsDataURL(file);
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          console.error('PDF upload error', errorMessage);
+          appendMessage({
+            actor: Actors.SYSTEM,
+            content: `Failed to process PDF: ${errorMessage}`,
+            timestamp: Date.now(),
+          });
+        }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         console.error('PDF upload error', errorMessage);
@@ -114,10 +135,11 @@ export const usePdfUpload = ({
           content: `Failed to upload PDF: ${errorMessage}`,
           timestamp: Date.now(),
         });
+      } finally {
         setUploadingPdf(false);
       }
     },
-    [isHistoricalSession, setupConnection, sendMessage, appendMessage, portRef],
+    [isHistoricalSession, setupConnection, sendMessage, appendMessage, portRef, readFileAsBase64],
   );
 
   return { uploadingPdf, handlePdfUpload };
