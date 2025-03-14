@@ -557,9 +557,10 @@ const SidePanel = () => {
 
       try {
         // Upload file to Supabase storage
-        const { data, error } = await supabase.storage.from('your-bucket-name').upload(`uploads/${file.name}`, file);
+        const { data, error } = await supabase.storage.from('resumepdf').upload(`uploads/${file.name}`, file);
 
         if (error) {
+          console.error('Error uploading file:', error.message);
           throw error;
         }
 
