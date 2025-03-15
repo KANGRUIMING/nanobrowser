@@ -18,7 +18,7 @@ import PdfUpload from './components/PdfUpload';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
-const SUPABASE_URL = 'https://uwswovzfhmegmxyccwaf.supabase.co  ';
+const SUPABASE_URL = 'https://uwswovzfhmegmxyccwaf.supabase.co';
 const SUPABASE_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3c3dvdnpmaG1lZ214eWNjd2FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIwMDUxNjUsImV4cCI6MjA1NzU4MTE2NX0._dbwD_rLVgXzI1ABY880TO6ty9ecHhgEXGSUkJRY4E4';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
