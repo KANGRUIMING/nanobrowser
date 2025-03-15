@@ -10,7 +10,7 @@ export class SupabaseService {
   // Example method to fetch PDF files
   static async getPdfFiles() {
     try {
-      const { data, error } = await supabase.from('pdf_files').select('*');
+      const { data, error } = await supabase.from('parsed_resumes').select('*');
 
       if (error) throw error;
       return data;
@@ -23,7 +23,7 @@ export class SupabaseService {
   // Example method to insert a PDF file
   static async insertPdfFile(fileData: any) {
     try {
-      const { data, error } = await supabase.from('pdf_files').insert([fileData]).select();
+      const { data, error } = await supabase.from('parsed_resumes').insert([fileData]).select();
 
       if (error) throw error;
       return data;
