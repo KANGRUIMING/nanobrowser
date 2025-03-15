@@ -18,10 +18,10 @@ import PdfUpload from './components/PdfUpload';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
-const supabaseUrl = 'https://wuszvpgeaivovcguytdj.supabase.co';
-const supabaseAnonKey =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1c3p2cGdlYWl2b3ZjZ3V5dGRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5Nzg0MDEsImV4cCI6MjA1NzU1NDQwMX0.tUXk9MkKwkgjZPpd4Yur--dXiwuEOiz0Pf_SvJh0IyM';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const SUPABASE_URL = 'https://pdpxvfgnagwgcgbnckjr.supabase.co';
+const SUPABASE_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkcHh2ZmduYWd3Z2NnYm5ja2pyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIwMDE1NjEsImV4cCI6MjA1NzU3NzU2MX0.tz9uMHvscPphIhW0kpy9yuqYrvf9-YSEfcd89UdP03w';
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const SidePanel = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -557,7 +557,7 @@ const SidePanel = () => {
 
       try {
         // Upload file to Supabase storage
-        const { data, error } = await supabase.storage.from('resumepdf').upload(`uploads/${file.name}`, file);
+        const { data, error } = await supabase.storage.from('resumeupload').upload(`${file.name}`, file);
 
         if (error) {
           console.error('Error uploading file:', error.message);
