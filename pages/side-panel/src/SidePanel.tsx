@@ -553,11 +553,13 @@ const SidePanel = () => {
     const file = event.target.files?.[0] || null;
     setUploadedFile(file);
     if (file) {
-      console.log('File selected:', file.name);
+      // Replace spaces with underscores in the file name
+      const sanitizedFileName = file.name.replace(/\s+/g, '_');
+      console.log('File selected:', sanitizedFileName);
 
       try {
-        // Upload file to Supabase storage
-        const { data, error } = await supabase.storage.from('resumeupload').upload(`${file.name}`, file);
+        // Upload file to Supabase storage with sanitized file name
+        const { data, error } = await supabase.storage.from('resumeupload').upload(`${sanitizedFileName}`, file);
 
         if (error) {
           console.error('Error uploading file:', error.message);
