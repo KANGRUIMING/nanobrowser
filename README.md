@@ -192,5 +192,84 @@ Made with ❤️ by the Nanobrowser Team.
 
 Like Nanobrowser? Give us a star 🌟 and join us in [Discord](https://discord.gg/NN3ABHggMK) | [X](https://x.com/nanobrowser_ai)
 
+# Job Application Agent
+
+This is a specialized Chrome extension that automates the job application process. The agent can search for jobs, fill out application forms, and track applications using AI.
+
+## Features
+
+- **Job Search**: Search across LinkedIn, Indeed, and Glassdoor with tailored keywords based on your resume
+- **Form Filling**: Automatically fill out job application forms using your resume data
+- **Application Tracking**: Track job applications and their statuses
+- **AI-Powered Responses**: Generate optimized responses for application questions based on your resume and preferences
+
+## Components
+
+The Job Application Agent consists of several key components:
+
+1. **Navigator Agent**: Handles website interaction, form filling, and job searching
+2. **Planner Agent**: Plans the job search and application strategy
+3. **Validator Agent**: Validates application completions and tracks results
+4. **Answerer Agent**: Generates tailored responses for application questions based on resume data
+
+## How to Use
+
+1. Provide your resume and job preferences
+2. Specify the types of jobs you're interested in
+3. The agent will:
+   - Search for relevant job postings
+   - Filter jobs based on your qualifications
+   - Fill out application forms automatically
+   - Track all applications for your review
+
+## Input Format
+
+The agent requires two key inputs:
+
+1. **Resume**: Your complete resume text
+2. **Job Preferences**: Description of desired jobs, including:
+   - Job titles you're targeting
+   - Desired location/remote preferences
+   - Salary expectations
+   - Company size preferences
+   - Industry preferences
+   - Other job-specific requirements
+
+## Implementation Notes
+
+This agent was created by modifying a universal browsing agent to specialize in job applications. Key changes include:
+
+1. Added job-specific actions for LinkedIn, Indeed, and Glassdoor
+2. Created a specialized Answerer agent for generating application form responses
+3. Modified prompts to focus on job application tasks
+4. Added resume and job preference inputs to guide the agent
+5. Implemented job application tracking
+
+## Technical Components
+
+The agent is built using:
+
+- Chrome Extension API
+- TypeScript
+- LangChain.js for AI interactions
+- Zod for schema validation
+
+## Example Usage
+
+```javascript
+const executor = new Executor(
+  "Apply to software engineering jobs that match my skills",
+  "job-application-task",
+  browserContext,
+  llmModel,
+  {
+    resume: "Full resume text here...",
+    jobPreferences: "Looking for remote React developer positions with salary range $100-140k"
+  }
+);
+
+await executor.execute();
+```
+
 
 

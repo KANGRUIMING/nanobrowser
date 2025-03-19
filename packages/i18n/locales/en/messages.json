@@ -1,11 +1,11 @@
 {
   "extensionDescription": {
     "description": "Extension description",
-    "message": "Nanobrowser is an AI agent that automates your browser usage."
+    "message": "Job Agent is an AI assistant that helps you search and apply for jobs."
   },
   "extensionName": {
     "description": "Extension name",
-    "message": "Nanobrowser"
+    "message": "Job Agent"
   },
   "toggleTheme": {
     "message": "Toggle theme"

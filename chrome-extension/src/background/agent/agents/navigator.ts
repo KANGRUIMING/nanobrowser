@@ -10,7 +10,6 @@ import { Actors, ExecutionState } from '../event/types';
 import { isAuthenticationError } from '@src/background/utils';
 import { ChatModelAuthError } from './errors';
 import { jsonNavigatorOutputSchema } from '../actions/json_schema';
-import { geminiNavigatorOutputSchema } from '../actions/json_gemini';
 const logger = createLogger('NavigatorAgent');
 
 export class NavigatorActionRegistry {
@@ -60,7 +59,7 @@ export class NavigatorAgent extends BaseAgent<z.ZodType, NavigatorResult> {
 
     this.actionRegistry = actionRegistry;
 
-    this.jsonSchema = this.modelName.startsWith('gemini') ? geminiNavigatorOutputSchema : jsonNavigatorOutputSchema;
+    this.jsonSchema = jsonNavigatorOutputSchema;
   }
 
   async invoke(inputMessages: BaseMessage[]): Promise<this['ModelOutput']> {

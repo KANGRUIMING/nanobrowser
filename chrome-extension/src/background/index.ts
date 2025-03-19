@@ -92,7 +92,7 @@ chrome.runtime.onConnect.addListener(port => {
             if (!message.tabId) return port.postMessage({ type: 'error', error: 'No tab ID provided' });
 
             logger.info('new_task', message.tabId, message.task);
-            currentExecutor = await setupExecutor(message.taskId, message.task, browserContext, message.apiKey, message.modelName, message.providerName);
+            currentExecutor = await setupExecutor(message.taskId, message.task, browserContext, message.apiKey, message.modelName, message.providerName, message.extraArgs);
             subscribeToExecutorEvents(currentExecutor);
 
             const result = await currentExecutor.execute();
@@ -121,7 +121,8 @@ chrome.runtime.onConnect.addListener(port => {
                 browserContext, 
                 message.apiKey, 
                 message.modelName, 
-                message.providerName
+                message.providerName,
+                message.extraArgs
               );
               subscribeToExecutorEvents(currentExecutor);
               const result = await currentExecutor.execute();
@@ -174,7 +175,15 @@ chrome.runtime.onConnect.addListener(port => {
   }
 });
 
-async function setupExecutor(taskId: string, task: string, browserContext: BrowserContext, apiKey?: string, modelName?: string, providerName?: string) {
+async function setupExecutor(
+  taskId: string, 
+  task: string, 
+  browserContext: BrowserContext, 
+  apiKey?: string, 
+  modelName?: string, 
+  providerName?: string,
+  extraArgs?: any
+) {
   // If hardcoded parameters are provided, use them instead of storage
   if (apiKey && modelName && providerName) {
     logger.info('Using hardcoded LLM configuration');
@@ -205,6 +214,12 @@ async function setupExecutor(taskId: string, task: string, browserContext: Brows
       modelName
     );
     
+    // Extract resume and jobPreferences from extraArgs if available
+    const resume = extraArgs?.resume || '';
+    const jobPreferences = extraArgs?.jobPreferences || '';
+    
+    logger.info(`Resume provided: ${resume ? 'Yes' : 'No'}, Job preferences provided: ${jobPreferences ? 'Yes' : 'No'}`);
+    
     const executor = new Executor(
       task,
       taskId,
@@ -212,7 +227,9 @@ async function setupExecutor(taskId: string, task: string, browserContext: Brows
       navigatorLLM,
       {
         ...(plannerLLM && { plannerLLM }),
-        ...(validatorLLM && { validatorLLM })
+        ...(validatorLLM && { validatorLLM }),
+        ...(resume && { resume }),
+        ...(jobPreferences && { jobPreferences })
       }
     );
     

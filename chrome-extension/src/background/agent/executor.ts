@@ -6,6 +6,7 @@ import { ValidatorAgent } from './agents/validator';
 import { NavigatorPrompt } from './prompts/navigator';
 import { PlannerPrompt } from './prompts/planner';
 import { ValidatorPrompt } from './prompts/validator';
+import { AnswererPrompt } from './prompts/answerer';
 import { createLogger } from '@src/background/log';
 import MessageManager from './messages/service';
 import type BrowserContext from '../browser/context';
@@ -13,6 +14,8 @@ import { ActionBuilder } from './actions/builder';
 import { EventManager } from './event/manager';
 import { Actors, type EventCallback, EventType, ExecutionState } from './event/types';
 import { ChatModelAuthError } from './agents/errors';
+import { AnswererAgent } from './agents/answerer';
+
 const logger = createLogger('Executor');
 
 export interface ExecutorExtraArgs {
@@ -20,6 +23,10 @@ export interface ExecutorExtraArgs {
   validatorLLM?: BaseChatModel;
   extractorLLM?: BaseChatModel;
   agentOptions?: Partial<AgentOptions>;
+  resume?: string;
+  jobPreferences?: string;
+  targetApplicationCount?: number;
+  resumePdfPath?: string;
 }
 
 export class Executor {
@@ -31,6 +38,9 @@ export class Executor {
   private readonly navigatorPrompt: NavigatorPrompt;
   private readonly validatorPrompt: ValidatorPrompt;
   private tasks: string[] = [];
+  private jobPreferences: string = '';
+  private resumeText: string = '';
+  
   constructor(
     task: string,
     taskId: string,
@@ -52,12 +62,36 @@ export class Executor {
       extraArgs?.agentOptions ?? {},
     );
 
+    // Store job preferences and resume
+    this.jobPreferences = extraArgs?.jobPreferences || '';
+    this.resumeText = extraArgs?.resume || '';
+    
+    // Set target application count if provided
+    if (extraArgs?.targetApplicationCount && extraArgs.targetApplicationCount > 0) {
+      context.targetApplicationCount = extraArgs.targetApplicationCount;
+    }
+    
+    // Set resume PDF path if provided
+    if (extraArgs?.resumePdfPath) {
+      context.resumePdfPath = extraArgs.resumePdfPath;
+    }
+    
+    // Record session start time
+    context.sessionStartTime = Date.now();
+
     this.tasks.push(task);
-    this.navigatorPrompt = new NavigatorPrompt(context.options.maxActionsPerStep);
-    this.plannerPrompt = new PlannerPrompt();
+    // Initialize prompts with job preferences if available
+    this.navigatorPrompt = new NavigatorPrompt(context.options.maxActionsPerStep, this.jobPreferences, this.resumeText);
+    this.plannerPrompt = new PlannerPrompt(this.jobPreferences);
     this.validatorPrompt = new ValidatorPrompt(task);
 
     const actionBuilder = new ActionBuilder(context, extractorLLM);
+    
+    // Set resume data if provided
+    if (extraArgs?.resume && extraArgs?.jobPreferences) {
+      actionBuilder.setResumeData(extraArgs.resume, extraArgs.jobPreferences);
+    }
+    
     const navigatorActionRegistry = new NavigatorActionRegistry(actionBuilder.buildDefaultActions());
 
     // Initialize agents with their respective prompts
@@ -273,5 +307,25 @@ export class Executor {
 
   async getCurrentTaskId(): Promise<string> {
     return this.context.taskId;
+  }
+
+  private createAnswererAgent() {
+    const prompt = new AnswererPrompt(this.resumeText, this.jobPreferences);
+    
+    // Create an AnswererAgent with the necessary parameters
+    return new AnswererAgent(
+      this.resumeText,
+      this.jobPreferences,
+      {
+        // Use the navigator's chatLLM
+        chatLLM: (this.navigator as any).chatLLM,
+        context: this.context,
+        prompt: prompt
+      }
+    );
+  }
+
+  private createExtractorAgent() {
+    // ... existing code ...
   }
 }

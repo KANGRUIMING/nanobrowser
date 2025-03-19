@@ -21,6 +21,17 @@ import { createLogger } from '@src/background/log';
 import { PromptTemplate } from '@langchain/core/prompts';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { ExecutionState, Actors } from '../event/types';
+import { AnswererAgent } from '../agents/answerer';
+import { AnswererPrompt } from '../prompts/answerer';
+import { 
+  createLinkedInSearchAction, 
+  createIndeedSearchAction, 
+  createGlassdoorSearchAction, 
+  createGetFormFieldAnswerAction, 
+  createAutofillFormAction, 
+  createTrackApplicationAction,
+  createUploadResumeAction
+} from './job';
 
 const logger = createLogger('Action');
 
@@ -102,10 +113,34 @@ export function buildDynamicActionSchema(actions: Action[]): z.ZodType {
 export class ActionBuilder {
   private readonly context: AgentContext;
   private readonly extractorLLM: BaseChatModel;
+  private resume: string = '';
+  private jobPreferences: string = '';
+  private answererAgent: AnswererAgent | null = null;
 
-  constructor(context: AgentContext, extractorLLM: BaseChatModel) {
+  constructor(context: AgentContext, extractorLLM: BaseChatModel, resume?: string, jobPreferences?: string) {
     this.context = context;
     this.extractorLLM = extractorLLM;
+    this.resume = resume || '';
+    this.jobPreferences = jobPreferences || '';
+  }
+
+  setResumeData(resume: string, jobPreferences: string): void {
+    this.resume = resume;
+    this.jobPreferences = jobPreferences;
+    
+    // Create a new AnswererPrompt and AnswererAgent if resume data is provided
+    if (resume && jobPreferences) {
+      const answererPrompt = new AnswererPrompt(resume, jobPreferences);
+      this.answererAgent = new AnswererAgent(
+        resume,
+        jobPreferences,
+        {
+          chatLLM: this.extractorLLM,
+          context: this.context,
+          prompt: answererPrompt
+        }
+      );
+    }
   }
 
   buildDefaultActions() {
@@ -356,6 +391,31 @@ export class ActionBuilder {
       }
     }, scrollToTextActionSchema);
     actions.push(scrollToText);
+
+    // Add job-specific actions if resume data is provided
+    if (this.resume && this.jobPreferences && this.answererAgent) {
+      const linkedInSearch = createLinkedInSearchAction(this.context);
+      actions.push(linkedInSearch);
+
+      const indeedSearch = createIndeedSearchAction(this.context);
+      actions.push(indeedSearch);
+
+      const glassdoorSearch = createGlassdoorSearchAction(this.context);
+      actions.push(glassdoorSearch);
+
+      const getFormFieldAnswer = createGetFormFieldAnswerAction(this.context, this.answererAgent);
+      actions.push(getFormFieldAnswer);
+
+      const autofillForm = createAutofillFormAction(this.context, this.resume, this.jobPreferences);
+      actions.push(autofillForm);
+
+      const trackApplication = createTrackApplicationAction(this.context);
+      actions.push(trackApplication);
+      
+      // Add resume upload action
+      const uploadResume = createUploadResumeAction(this.context);
+      actions.push(uploadResume);
+    }
 
     return actions;
   }

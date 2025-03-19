@@ -191,7 +191,7 @@ h1 {
 
 /* Run Button */
 .run-button {
-  background-color: #0078d4;
+  background-color: #4a90e2;
   color: white;
   border: none;
   border-radius: 4px;
@@ -202,8 +202,8 @@ h1 {
   flex: 1;
 }
 
-.run-button:hover:not(:disabled) {
-  background-color: #0063b1;
+.run-button:hover {
+  background-color: #3a7bc8;
 }
 
 .run-button:active:not(:disabled) {
@@ -274,7 +274,7 @@ h1 {
   padding: 8px 12px;
   border-radius: 4px;
   background-color: #f0f0f0;
-  border-left: 3px solid #0078d4;
+  border-left: 3px solid #4a90e2;
   font-size: 14px;
   line-height: 1.5;
   word-wrap: break-word;
@@ -328,5 +328,165 @@ h1 {
   
   ::-webkit-scrollbar-thumb {
     background: #0078d4;
+  }
+}
+
+.panel-title {
+  font-size: 1.5rem;
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #333;
+  text-align: center;
+}
+
+.resume-preview {
+  margin-bottom: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 0.5rem;
+  max-height: 100px;
+  overflow-y: auto;
+  background-color: #f9f9f9;
+  font-size: 0.8rem;
+}
+
+.job-preferences {
+  margin-bottom: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 0.5rem;
+  background-color: #f9f9f9;
+  font-size: 0.9rem;
+}
+
+.target-apps-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  background-color: #f5f5f5;
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.target-apps-container label {
+  margin-right: 10px;
+  font-weight: bold;
+}
+
+.target-apps-container input {
+  width: 60px;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.application-history {
+  margin-bottom: 15px;
+  background-color: #f5f5f5;
+  padding: 15px;
+  border-radius: 4px;
+}
+
+.application-history h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 16px;
+  color: #333;
+}
+
+.applied-job-list {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.applied-job-item {
+  padding: 8px;
+  border-bottom: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.applied-job-item:last-child {
+  border-bottom: none;
+}
+
+.job-date {
+  font-size: 12px;
+  color: #666;
+  margin-top: 2px;
+}
+
+.more-jobs {
+  font-size: 12px;
+  text-align: center;
+  color: #666;
+  padding: 5px;
+}
+
+.clear-history-button {
+  background-color: #ff5252;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.3s;
+}
+
+.clear-history-button:hover {
+  background-color: #ff0000;
+}
+
+.clear-history-button:disabled {
+  background-color: #ffcccc;
+  cursor: not-allowed;
+}
+
+.application-progress {
+  margin-bottom: 15px;
+  padding: 10px;
+  background-color: #f8f8f8;
+  border-radius: 4px;
+  border: 1px solid #eee;
+}
+
+.progress-label {
+  margin-bottom: 5px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #333;
+}
+
+.progress-bar-container {
+  height: 10px;
+  background-color: #e0e0e0;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #4caf50;
+  transition: width 0.3s ease;
+}
+
+@media (prefers-color-scheme: dark) {
+  .application-progress {
+    background-color: #2d2d2d;
+    border-color: #444;
+  }
+  
+  .progress-label {
+    color: #ddd;
+  }
+  
+  .progress-bar-container {
+    background-color: #555;
+  }
+  
+  .progress-bar {
+    background-color: #4caf50;
   }
 }

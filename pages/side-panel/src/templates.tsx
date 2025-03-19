@@ -2,14 +2,14 @@
 export const defaultTemplates = [
   {
     id: '1',
-    title: '🌟 Star us on GitHub!',
+    title: '💼 Resume Optimization',
     content:
-      "Open the Nanobrowser repository at https://github.com/nanobrowser/nanobrowser and check if you've already starred it. If not, please support us by giving us a star!",
+      "Help me optimize my resume for job applications. Analyze my current resume and suggest improvements to highlight my skills and experience more effectively.",
   },
   {
     id: '2',
-    title: 'Follow us on X!',
-    content: 'Follow us at https://x.com/nanobrowser_ai to stay updated on the latest news and features!',
+    title: 'Job Search Strategy',
+    content: 'Create a comprehensive job search strategy for me, including which platforms to use, how to network effectively, and tips for standing out in applications.',
   },
   {
     id: '3',

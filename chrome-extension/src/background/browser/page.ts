@@ -21,7 +21,6 @@ import {
 import { DOMElementNode, type DOMState } from '../dom/views';
 import { type BrowserContextConfig, DEFAULT_BROWSER_CONTEXT_CONFIG, type PageState } from './types';
 import { createLogger } from '@src/background/log';
-import { use } from 'react/ts5.0';
 
 const logger = createLogger('Page');
 
@@ -1103,6 +1102,59 @@ export default class Page {
     // Sleep remaining time if needed
     if (remaining > 0) {
       await new Promise(resolve => setTimeout(resolve, remaining * 1000)); // Convert seconds to milliseconds
+    }
+  }
+
+  /**
+   * Uploads a file to a file input element
+   * @param elementIndex - The index of the file input element
+   * @param filePath - The path to the file to upload
+   * @returns Promise<void>
+   */
+  async uploadFile(elementIndex: number, filePath: string): Promise<void> {
+    if (!this._puppeteerPage) {
+      throw new Error('Puppeteer is not connected');
+    }
+
+    try {
+      const selectorMap = this.getSelectorMap();
+      const elementNode = selectorMap.get(elementIndex);
+      
+      if (!elementNode) {
+        throw new Error(`Element with index ${elementIndex} not found`);
+      }
+      
+      // Verify element is a file input
+      if (elementNode.tagName !== 'INPUT' || elementNode.attributes?.type !== 'file') {
+        throw new Error(`Element with index ${elementIndex} is not a file input`);
+      }
+      
+      // Highlight before uploading
+      if (elementNode.highlightIndex !== undefined) {
+        await this._updateState(true, elementNode.highlightIndex);
+      }
+      
+      const element = await this.locateElement(elementNode);
+      if (!element) {
+        throw new Error(`Element: ${elementNode} not found in DOM`);
+      }
+      
+      // Scroll element into view if needed
+      await this._scrollIntoViewIfNeeded(element);
+      
+      // Upload file
+      await (element as any).uploadFile(filePath);
+      
+      // Trigger change event to ensure the upload is registered
+      await element.evaluate(el => {
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      
+      logger.info(`Successfully uploaded file: ${filePath} to element with index ${elementIndex}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Failed to upload file: ${errorMessage}`);
+      throw new Error(`Failed to upload file: ${errorMessage}`);
     }
   }
 }

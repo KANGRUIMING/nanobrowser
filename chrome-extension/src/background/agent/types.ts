@@ -56,6 +56,10 @@ export class AgentContext {
   stepInfo: AgentStepInfo | null;
   actionResults: ActionResult[];
   stateMessageAdded: boolean;
+  public targetApplicationCount: number = Infinity;
+  public sessionStartTime: number = Date.now();
+  public resumePdfPath: string = '';
+
   constructor(
     taskId: string,
     browserContext: BrowserContext,
@@ -160,4 +164,13 @@ export interface AgentOutput<T = unknown> {
    * The error that occurred during the agent's action
    */
   error?: string;
+}
+
+export interface JobApplication {
+  id: string;
+  company: string;
+  position: string;
+  url: string;
+  date_applied: string;
+  status: 'applied' | 'saved' | 'in_progress';
 }

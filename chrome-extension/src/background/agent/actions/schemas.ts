@@ -147,3 +147,69 @@ export const selectDropdownOptionActionSchema: ActionSchema = {
     text: z.string(),
   }),
 };
+
+export const searchLinkedInActionSchema: ActionSchema = {
+  name: 'search_linkedin',
+  description: 'Search LinkedIn jobs in the current tab',
+  schema: z.object({
+    query: z.string(),
+  }),
+};
+
+export const searchIndeedActionSchema: ActionSchema = {
+  name: 'search_indeed',
+  description: 'Search Indeed jobs in the current tab',
+  schema: z.object({
+    query: z.string(),
+  }),
+};
+
+export const searchGlassdoorActionSchema: ActionSchema = {
+  name: 'search_glassdoor',
+  description: 'Search Glassdoor jobs in the current tab',
+  schema: z.object({
+    query: z.string(),
+  }),
+};
+
+// Form Filling Actions
+export const getFormFieldAnswerActionSchema: ActionSchema = {
+  name: 'get_form_field_answer',
+  description: 'Get an AI-generated answer for a form field based on resume data and automatically fill the field',
+  schema: z.object({
+    field_name: z.string(),
+    element_index: z.number(),
+    field_type: z.enum(['text', 'textarea', 'select', 'radio', 'checkbox']).optional(),
+  }),
+};
+
+export const autofillFormActionSchema: ActionSchema = {
+  name: 'autofill_form',
+  description: 'Automatically fill common fields in a job application form based on resume data',
+  schema: z.object({
+    form_type: z.enum(['personal_info', 'work_experience', 'education', 'skills']),
+  }),
+};
+
+// Application Tracking
+export const trackApplicationActionSchema: ActionSchema = {
+  name: 'track_application',
+  description: 'Save information about the current job application',
+  schema: z.object({
+    company: z.string(),
+    position: z.string(),
+    date_applied: z.string().optional(),
+    url: z.string().optional(),
+    status: z.enum(['applied', 'saved', 'in_progress']).optional(),
+  }),
+};
+
+// Resume Upload
+export const uploadResumeActionSchema: ActionSchema = {
+  name: 'upload_resume',
+  description: 'Upload resume PDF file to a file input field',
+  schema: z.object({
+    element_index: z.number(),
+    desc: z.string().optional(),
+  }),
+};
