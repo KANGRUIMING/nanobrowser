@@ -5,7 +5,7 @@ import './SidePanel.css';
 // with your own Job Agent icons to complete rebranding
 
 // Hardcoded parameters for testing
-const HARDCODED_API_KEY = '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'; // Replace with actual API key
+const HARDCODED_API_KEY = ''; // Replace with actual API key
 
 // Hardcoded path to resume PDF file for uploads
 const PDF_RESUME_PATH = '/path/to/resume.pdf'; // Replace with actual resume PDF path
