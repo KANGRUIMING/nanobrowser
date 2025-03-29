@@ -30,6 +30,8 @@ export const searchLinkedInActionSchema: ActionSchema = {
       .describe('Job type: "Full-time", "Part-time", "Contract", "Internship", or "Temporary"'),
     salary: z.string().optional().describe('Salary filter (e.g., "100000")'),
     companyId: z.string().optional().describe('Company ID for filtering by company'),
+    datePosted: z.string().optional().describe('Date posted filter: "past_24h", "past_week", or "past_month"'),
+    remoteOption: z.boolean().optional().describe('Whether to filter for remote jobs'),
   }),
 };
 
