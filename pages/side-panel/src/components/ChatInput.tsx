@@ -92,7 +92,7 @@ export default function ChatInput({
                 ? 'bg-slate-800 text-gray-200'
                 : 'bg-white'
           }`}
-          placeholder="What can I help with?"
+          placeholder="Paste Resume here?"
           aria-label="Message input"
         />
 
