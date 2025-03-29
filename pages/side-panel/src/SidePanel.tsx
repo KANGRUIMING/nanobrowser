@@ -23,11 +23,14 @@ const SidePanel = () => {
   const [isFollowUpMode, setIsFollowUpMode] = useState(false);
   const [isHistoricalSession, setIsHistoricalSession] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [jobTitle, setJobTitle] = useState('');
-  const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
-  const [jobLocation, setJobLocation] = useState('');
-  const [selectedExperienceLevels, setSelectedExperienceLevels] = useState<string[]>([]);
-  const [selectedSalary, setSelectedSalary] = useState('');
+
+  // Job preference fields
+  const [role, setRole] = useState('');
+  const [positionType, setPositionType] = useState('');
+  const [selectedDatePosted, setSelectedDatePosted] = useState('');
+  const [preferredLocation, setPreferredLocation] = useState('');
+  const [isRemote, setIsRemote] = useState(false);
+
   const [showJobPreferences, setShowJobPreferences] = useState(false);
   const [showUploadResume, setShowUploadResume] = useState(false);
   const [resumeText, setResumeText] = useState('');
@@ -37,6 +40,7 @@ const SidePanel = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const setInputTextRef = useRef<((text: string) => void) | null>(null);
   const [isDisabled, setIsDisabled] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Check for dark mode preference - we're now forcing light mode
   useEffect(() => {
@@ -502,29 +506,15 @@ const SidePanel = () => {
     }
   };
 
-  const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Temporary', 'Volunteer', 'Internship', 'Other'];
+  // Define restricted position types and date posted options
+  const positionTypes = ['Internship', 'Full-time'];
 
-  const experienceLevels = ['Internship', 'Entry level', 'Associate', 'Mid-Senior level', 'Director', 'Executive'];
-
-  const salaryOptions = [
-    '$40,000+',
-    '$60,000+',
-    '$80,000+',
-    '$100,000+',
-    '$120,000+',
-    '$140,000+',
-    '$160,000+',
-    '$180,000+',
-    '$200,000+',
+  const datePostedOptions = [
+    { value: 'any', label: 'Any time' },
+    { value: 'past_month', label: 'Past month' },
+    { value: 'past_week', label: 'Past week' },
+    { value: 'past_24h', label: 'Past 24 hours' },
   ];
-
-  const toggleJobType = (jobType: string) => {
-    setSelectedJobTypes(prev => (prev.includes(jobType) ? prev.filter(type => type !== jobType) : [...prev, jobType]));
-  };
-
-  const toggleExperienceLevel = (level: string) => {
-    setSelectedExperienceLevels(prev => (prev.includes(level) ? prev.filter(l => l !== level) : [...prev, level]));
-  };
 
   const handleSetJobPreferences = () => {
     setShowJobPreferences(true);
@@ -536,43 +526,57 @@ const SidePanel = () => {
     setShowJobPreferences(false);
   };
 
-  const handleApplyNow = () => {
-    // Format job preferences into a message
-    let message = "I'm looking for";
-
-    // Add job title if provided
-    if (jobTitle) {
-      message += ` a ${jobTitle} position`;
-    } else {
-      message += ' a job';
+  const getDatePostedText = (value: string): string => {
+    switch (value) {
+      case 'past_month':
+        return 'posted in the Past Month';
+      case 'past_week':
+        return 'posted in the Past Week';
+      case 'past_24h':
+        return 'posted in the Past 24 Hours';
+      default:
+        return '';
     }
+  };
 
-    // Add job types if selected
-    if (selectedJobTypes.length > 0) {
-      message += ` that is ${selectedJobTypes.join(' or ')}`;
+  const handleApplyNow = () => {
+    // Ensure role doesn't exceed 30 characters
+    const trimmedRole = role.trim().substring(0, 30);
+
+    // Build search string from role and position type
+    const searchString =
+      trimmedRole && positionType
+        ? `${trimmedRole} ${positionType}`
+        : trimmedRole || (positionType ? `${positionType} job` : 'job');
+
+    // Start building the message
+    let message = `I'm looking for a ${searchString}`;
+
+    // Add date posted if selected
+    if (selectedDatePosted && selectedDatePosted !== 'any') {
+      message += `, ${getDatePostedText(selectedDatePosted)}`;
     }
 
     // Add location if provided
-    if (jobLocation) {
-      message += ` in ${jobLocation}`;
+    if (preferredLocation.trim()) {
+      message += `, in ${preferredLocation.trim()}`;
     }
 
-    // Add experience level if selected
-    if (selectedExperienceLevels.length > 0) {
-      message += `. My experience level is ${selectedExperienceLevels.join(' or ')}`;
-    }
+    // Add remote preference
+    message += `, with Remote? set to ${isRemote ? 'Yes' : 'No'}`;
 
-    // Add salary expectation if selected
-    if (selectedSalary) {
-      message += `. I'm looking for a salary of ${selectedSalary}`;
-    }
+    // Add Easy Apply reference
+    message += `. Use Easy Apply.`;
+
+    // Add explicit automation instructions
+    message += ` Please go to the LinkedIn search tab, type "${searchString}", and then navigate through the search result filters (date posted, remote, etc.) to match these preferences.`;
 
     // Add resume text if provided
     if (resumeText) {
-      message += '.\n\nHere is my resume:\n' + resumeText;
+      message += '\n\nHere is my resume:\n' + resumeText;
     }
 
-    message += '.\n\nCan you help me find suitable job openings and possibly prepare application materials?';
+    message += '\n\nCan you help me apply to suitable jobs that match my preferences and qualifications?';
 
     // Send the message using the existing function
     handleSendMessage(message);
@@ -752,124 +756,135 @@ const SidePanel = () => {
                 ) : (
                   <div className="flex-1 flex flex-col overflow-y-auto">
                     <div className="p-1 flex-1">
+                      {/* Role */}
                       <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
                         <label
-                          htmlFor="jobTitle"
+                          htmlFor="role"
                           className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-1`}>
-                          Job Title
+                          Role
                         </label>
                         <input
-                          id="jobTitle"
+                          id="role"
                           type="text"
-                          value={jobTitle}
-                          onChange={e => setJobTitle(e.target.value)}
-                          placeholder="Enter your job title"
+                          value={role}
+                          onChange={e => setRole(e.target.value.substring(0, 30))}
+                          placeholder="e.g., Software Engineer"
+                          maxLength={30}
                           className={`w-full px-3 py-2 rounded-md border ${
                             isDarkMode
                               ? 'bg-slate-800 border-sky-800 text-white placeholder-gray-400'
                               : 'bg-white border-sky-200 text-gray-800 placeholder-gray-500'
                           } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-sky-500' : 'focus:ring-sky-300'}`}
                         />
-                      </div>
-                      <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                        <label
-                          className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-2`}>
-                          Job Type
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {jobTypes.map(jobType => (
-                            <div key={jobType} className="flex items-center">
-                              <input
-                                id={`jobType-${jobType}`}
-                                type="checkbox"
-                                checked={selectedJobTypes.includes(jobType)}
-                                onChange={() => toggleJobType(jobType)}
-                                className={`h-4 w-4 rounded ${
-                                  isDarkMode
-                                    ? 'border-sky-700 bg-slate-700 text-sky-500'
-                                    : 'border-sky-300 text-sky-600'
-                                } focus:ring-2 focus:ring-sky-400`}
-                              />
-                              <label htmlFor={`jobType-${jobType}`} className="ml-2 block text-sm">
-                                {jobType}
-                              </label>
-                            </div>
-                          ))}
+                        <div
+                          className={`text-xs mt-1 text-right ${
+                            role.length >= 25 ? 'text-orange-500' : isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                          }`}>
+                          {role.length}/30
                         </div>
                       </div>
-                      <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                        <label
-                          htmlFor="jobLocation"
-                          className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-1`}>
-                          Job Location
-                        </label>
-                        <input
-                          id="jobLocation"
-                          type="text"
-                          value={jobLocation}
-                          onChange={e => setJobLocation(e.target.value)}
-                          placeholder="Enter job location or 'Remote'"
-                          className={`w-full px-3 py-2 rounded-md border ${
-                            isDarkMode
-                              ? 'bg-slate-800 border-sky-800 text-white placeholder-gray-400'
-                              : 'bg-white border-sky-200 text-gray-800 placeholder-gray-500'
-                          } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-sky-500' : 'focus:ring-sky-300'}`}
-                        />
-                      </div>
+
+                      {/* Position Type - restricted to just Internship and Full-time */}
                       <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
                         <label
                           className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-2`}>
-                          Experience Level
+                          Position Type
                         </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {experienceLevels.map(level => (
-                            <div key={level} className="flex items-center">
+                        <div className="flex gap-4">
+                          {positionTypes.map(type => (
+                            <div key={type} className="flex items-center">
                               <input
-                                id={`experienceLevel-${level}`}
-                                type="checkbox"
-                                checked={selectedExperienceLevels.includes(level)}
-                                onChange={() => toggleExperienceLevel(level)}
-                                className={`h-4 w-4 rounded ${
-                                  isDarkMode
-                                    ? 'border-sky-700 bg-slate-700 text-sky-500'
-                                    : 'border-sky-300 text-sky-600'
-                                } focus:ring-2 focus:ring-sky-400`}
-                              />
-                              <label htmlFor={`experienceLevel-${level}`} className="ml-2 block text-sm">
-                                {level}
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                        <label
-                          className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-2`}>
-                          Salary
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {salaryOptions.map(salary => (
-                            <div key={salary} className="flex items-center">
-                              <input
-                                id={`salary-${salary}`}
+                                id={`positionType-${type}`}
                                 type="radio"
-                                name="salary"
-                                value={salary}
-                                checked={selectedSalary === salary}
-                                onChange={() => setSelectedSalary(salary)}
+                                name="positionType"
+                                value={type}
+                                checked={positionType === type}
+                                onChange={() => setPositionType(type)}
                                 className={`h-4 w-4 ${
                                   isDarkMode
                                     ? 'border-sky-700 bg-slate-700 text-sky-500'
                                     : 'border-sky-300 text-sky-600'
                                 } focus:ring-2 focus:ring-sky-400`}
                               />
-                              <label htmlFor={`salary-${salary}`} className="ml-2 block text-sm">
-                                {salary}
+                              <label htmlFor={`positionType-${type}`} className="ml-2 block text-sm">
+                                {type}
                               </label>
                             </div>
                           ))}
                         </div>
                       </div>
+
+                      {/* Date Posted */}
+                      <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                        <label
+                          className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-2`}>
+                          Date Posted
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {datePostedOptions.map(option => (
+                            <div key={option.value} className="flex items-center">
+                              <input
+                                id={`datePosted-${option.value}`}
+                                type="radio"
+                                name="datePosted"
+                                value={option.value}
+                                checked={selectedDatePosted === option.value}
+                                onChange={() => setSelectedDatePosted(option.value)}
+                                className={`h-4 w-4 ${
+                                  isDarkMode
+                                    ? 'border-sky-700 bg-slate-700 text-sky-500'
+                                    : 'border-sky-300 text-sky-600'
+                                } focus:ring-2 focus:ring-sky-400`}
+                              />
+                              <label htmlFor={`datePosted-${option.value}`} className="ml-2 block text-sm">
+                                {option.label}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Preferred Location */}
+                      <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                        <label
+                          htmlFor="preferredLocation"
+                          className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-1`}>
+                          Preferred Location
+                        </label>
+                        <input
+                          id="preferredLocation"
+                          type="text"
+                          value={preferredLocation}
+                          onChange={e => setPreferredLocation(e.target.value)}
+                          placeholder="e.g., New York, Remote, San Francisco"
+                          className={`w-full px-3 py-2 rounded-md border ${
+                            isDarkMode
+                              ? 'bg-slate-800 border-sky-800 text-white placeholder-gray-400'
+                              : 'bg-white border-sky-200 text-gray-800 placeholder-gray-500'
+                          } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-sky-500' : 'focus:ring-sky-300'}`}
+                        />
+                      </div>
+
+                      {/* Remote? */}
+                      <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                        <div className="flex items-center">
+                          <input
+                            id="isRemote"
+                            type="checkbox"
+                            checked={isRemote}
+                            onChange={e => setIsRemote(e.target.checked)}
+                            className={`h-4 w-4 rounded ${
+                              isDarkMode ? 'border-sky-700 bg-slate-700 text-sky-500' : 'border-sky-300 text-sky-600'
+                            } focus:ring-2 focus:ring-sky-400`}
+                          />
+                          <label
+                            htmlFor="isRemote"
+                            className={`ml-2 block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'}`}>
+                            Remote?
+                          </label>
+                        </div>
+                      </div>
+
                       <div className="flex justify-end px-3 mb-4">
                         <button
                           onClick={() => setShowJobPreferences(false)}
