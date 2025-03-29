@@ -448,10 +448,6 @@ const SidePanel = () => {
     setIsFollowUpMode(false);
     setIsHistoricalSession(false);
 
-    // Hide job preferences or resume upload if they're showing
-    setShowJobPreferences(false);
-    setShowUploadResume(false);
-
     // Disconnect any existing connection
     stopConnection();
   };
@@ -618,13 +614,7 @@ const SidePanel = () => {
                 ← Back
               </button>
             ) : (
-              <img
-                src="/icon-128.png"
-                alt="Extension Logo"
-                className="size-6 cursor-pointer"
-                onClick={handleNewChat}
-                title="Return to home"
-              />
+              <img src="/icon-128.png" alt="Extension Logo" className="size-6" />
             )}
           </div>
           <div className="header-icons">
