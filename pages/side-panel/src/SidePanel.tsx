@@ -557,24 +557,14 @@ const SidePanel = () => {
       // Add a message to show that the search is being initiated
       appendMessage({
         actor: Actors.SYSTEM,
-        content: `Opening LinkedIn job search in a new tab for: ${searchParams.query} ${searchParams.location ? 'in ' + searchParams.location : ''} ${searchParams.datePosted ? '(' + searchParams.datePosted.replace('_', ' ') + ')' : ''} ${searchParams.remoteOption ? '(Remote)' : ''}`,
+        content: `Opening LinkedIn job search in a new tab for: ${searchParams.query} ${searchParams.location ? 'in ' + searchParams.location : ''} ${searchParams.datePosted ? '(' + getDatePostedText(selectedDatePosted) + ')' : ''} ${searchParams.remoteOption ? '(Remote)' : ''}`,
         timestamp: Date.now(),
       });
 
-      // Try direct navigation as a fallback if messaging fails
-      try {
-        // First try sending a message to the background script
-        await chrome.runtime.sendMessage({
-          type: 'direct_linkedin_search',
-          params: searchParams,
-        });
-      } catch (msgError) {
-        console.log('Background messaging failed, using direct navigation fallback');
-
-        // If messaging fails, construct the URL and open it directly
-        const url = createLinkedInSearchUrl(searchParams);
-        window.open(url, '_blank');
-      }
+      // Skip background messaging and directly construct the URL
+      const url = createLinkedInSearchUrl(searchParams);
+      window.open(url, '_blank');
+      console.log('LinkedIn search opened via direct navigation');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       console.error('Navigation error', errorMessage);

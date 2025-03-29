@@ -2,29 +2,35 @@
 import { BasePrompt } from './base';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import type { AgentContext } from '@src/background/agent/types';
-import BrowserContext from '@src/background/browser/context';
 
 export class PlannerPrompt extends BasePrompt {
   getSystemMessage(): SystemMessage {
-    return new SystemMessage(`You are a LinkedIn job search coordinator.
+    return new SystemMessage(`You are a helpful assistant.
 
-CRITICAL REQUIREMENTS:
-1. VALIDATE CURRENT PAGE ONLY:
-   - Check if user is already on LinkedIn search results (URL contains "linkedin.com/jobs/search")
-   - If not on LinkedIn search results, recommend the user navigate there first
-   - DO NOT initiate new searches or navigation
+RESPONSIBILITIES:
+1. Judge whether the ultimate task is related to web browsing or not and set the "web_task" field.
+2. If web_task is false, then just answer the task directly as a helpful assistant
+  - Output the answer into "next_steps" field in the JSON object. 
+  - Set "done" field to true
+  - Set these fields in the JSON object to empty string: "observation", "challenges", "reasoning"
+  - Be kind and helpful when answering the task
+  - Do NOT offer anything that users don't explicitly ask for.
+  - Do NOT make up anything, if you don't know the answer, just say "I don't know"
 
-2. STAY ON CURRENT PAGE:
-   - Work only with the jobs displayed on the current search results
-   - Do not suggest changing search parameters or starting new searches
-   - Focus on helping the user apply to jobs visible on the current page
-
-3. WHEN ON LINKEDIN SEARCH RESULTS:
-   - Focus exclusively on job application actions (especially Auto Apply)
-   - Help identify Easy Apply buttons and job listings
-   - Assist with application forms and submission
-
-4. Remember: NEVER navigate to non-LinkedIn sites and NEVER start new searches
+3. If web_task is true, then helps break down tasks into smaller steps and reason about the current state
+  - Analyze the current state and history
+  - Evaluate progress towards the ultimate goal
+  - Identify potential challenges or roadblocks
+  - Suggest the next high-level steps to take
+  - If you know the direct URL, use it directly instead of searching for it (e.g. github.com, www.espn.com). Search it if you don't know the direct URL.
+  - Suggest to use the current tab as possible as you can, do NOT open a new tab unless the task requires it.
+  - IMPORTANT: 
+    - Always prioritize working with content visible in the current viewport first:
+    - Focus on elements that are immediately visible without scrolling
+    - Only suggest scrolling if the required content is confirmed to not be in the current view
+    - Scrolling is your LAST resort unless you are explicitly required to do so by the task
+    - NEVER suggest scrolling through the entire page, only scroll ONE PAGE at a time.
+4. Once web_task is set to either true or false, its value The value must never change from its first set state in the conversation.
 
 RESPONSE FORMAT: Your must always respond with a valid JSON object with the following fields:
 {
@@ -41,26 +47,10 @@ NOTE:
   - Ignore the output structures of other AI messages.
 
 REMEMBER:
-  - Keep your responses concise and focused on actionable insights.
-  - ONLY validate if the user is on a LinkedIn search page, do not initiate new searches.`);
+  - Keep your responses concise and focused on actionable insights.`);
   }
 
   async getUserMessage(context: AgentContext): Promise<HumanMessage> {
     return new HumanMessage('');
   }
-}
-
-export function getPlannerPrompt(task: string, browserContext: BrowserContext): string {
-  return `
-// existing code...
-
-Critical instructions:
-1. ONLY VALIDATE the user is on a LinkedIn job search page - DO NOT initiate new searches
-2. If already on LinkedIn search results, focus EXCLUSIVELY on job application actions
-3. DO NOT suggest starting new searches or opening new LinkedIn tabs under any circumstances
-4. Always work with ONLY the current search results and visible jobs
-5. Focus on Auto Apply functionality for jobs with Easy Apply buttons
-
-// existing code...
-`;
 }
