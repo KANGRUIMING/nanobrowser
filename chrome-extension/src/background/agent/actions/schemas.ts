@@ -16,22 +16,20 @@ export const doneActionSchema: ActionSchema = {
 
 export const searchLinkedInActionSchema: ActionSchema = {
   name: 'search_linkedin',
-  description: 'Navigate directly to LinkedIn job search with specified parameters',
+  description: 'Search LinkedIn for jobs using specific parameters',
   schema: z.object({
-    query: z.string().describe('Job title or keywords'),
-    location: z.string().optional().describe('Job location (e.g., "Austin, Texas")'),
+    query: z.string().describe('Job title or keywords to search for'),
+    location: z.string().optional().describe('Geographic location for job search'),
     experienceLevel: z
       .string()
       .optional()
-      .describe('Experience level: "Entry level", "Associate", "Mid-Senior level", "Director", or "Executive"'),
-    jobType: z
-      .string()
-      .optional()
-      .describe('Job type: "Full-time", "Part-time", "Contract", "Internship", or "Temporary"'),
-    salary: z.string().optional().describe('Salary filter (e.g., "100000")'),
-    companyId: z.string().optional().describe('Company ID for filtering by company'),
-    datePosted: z.string().optional().describe('Date posted filter: "past_24h", "past_week", or "past_month"'),
-    remoteOption: z.boolean().optional().describe('Whether to filter for remote jobs'),
+      .describe('Experience level (entry level, associate, mid-senior level, director, executive)'),
+    jobType: z.string().optional().describe('Job type (full-time, part-time, contract, internship, temporary)'),
+    salary: z.string().optional().describe('Salary range'),
+    companyId: z.string().optional().describe('LinkedIn company ID to filter by'),
+    datePosted: z.string().optional().describe('Date posted (past_24h, past_week, past_month)'),
+    remoteOption: z.boolean().optional().describe('Set to true to filter for remote jobs'),
+    easyApplyOnly: z.boolean().optional().describe('Set to true to show only Easy Apply jobs'),
   }),
 };
 
@@ -169,17 +167,40 @@ export const selectDropdownOptionActionSchema: ActionSchema = {
   }),
 };
 
-export const linkedInEasyApplySchema = z.object({
-  jobId: z.string().optional().describe('The job ID to apply for (if known)'),
-  resumeText: z.string().optional().describe('Resume text to use in the application'),
-  useDefaultResume: z.boolean().optional().describe('Whether to use the default resume already uploaded to LinkedIn'),
-});
+export const linkedInEasyApplySchema: ActionSchema = {
+  name: 'linkedin_easy_apply',
+  description: 'Start the Easy Apply process for a LinkedIn job',
+  schema: z.object({
+    jobId: z.string().optional().describe('The job ID to apply for (if known)'),
+    resumeText: z.string().optional().describe('Resume text to use in the application'),
+    useDefaultResume: z.boolean().optional().describe('Whether to use the default resume already uploaded to LinkedIn'),
+  }),
+};
 
-export const linkedInFillApplicationSchema = z.object({
-  fieldIndexes: z.array(z.number()).describe('The indexes of the form fields to fill'),
-  values: z.array(z.string()).describe('The values to put in each field'),
-});
+export const linkedInFillApplicationSchema: ActionSchema = {
+  name: 'linkedin_fill_application',
+  description: 'Fill out fields in a LinkedIn job application form',
+  schema: z.object({
+    fieldIndexes: z.array(z.number()).describe('The indexes of the form fields to fill'),
+    values: z.array(z.string()).describe('The values to put in each field'),
+  }),
+};
 
-export const linkedInSubmitApplicationSchema = z.object({
-  confirm: z.boolean().describe('Set to true to confirm submission'),
-});
+export const linkedInSubmitApplicationSchema: ActionSchema = {
+  name: 'linkedin_submit_application',
+  description: 'Submit a completed LinkedIn job application',
+  schema: z.object({
+    confirm: z.boolean().describe('Set to true to confirm submission'),
+  }),
+};
+
+export const linkedInAutoApplySchema: ActionSchema = {
+  name: 'linkedin_auto_apply',
+  description: 'Automatically apply to multiple LinkedIn Easy Apply jobs in search results',
+  schema: z.object({
+    maxJobs: z.number().optional().describe('Maximum number of jobs to apply to (default: 5)'),
+    resumeText: z.string().optional().describe('Resume text to use in applications'),
+    useDefaultResume: z.boolean().optional().describe('Whether to use default resume from LinkedIn'),
+    applyToAll: z.boolean().optional().describe('Whether to apply to all available Easy Apply jobs'),
+  }),
+};

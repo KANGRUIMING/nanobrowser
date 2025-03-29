@@ -551,6 +551,7 @@ const SidePanel = () => {
         experienceLevel: positionType || undefined,
         datePosted: selectedDatePosted !== 'any' ? selectedDatePosted : undefined,
         remoteOption: isRemote,
+        easyApplyOnly: true,
       };
 
       // Add a message to show that the search is being initiated
@@ -611,6 +612,7 @@ const SidePanel = () => {
     jobType?: string;
     datePosted?: string;
     remoteOption?: boolean;
+    easyApplyOnly?: boolean;
   }): string => {
     // Build the LinkedIn URL with parameters
     const keywords = encodeURIComponent(params.query || 'jobs');
@@ -659,11 +661,52 @@ const SidePanel = () => {
       if (date) datePosted = `&f_TPR=${date}`;
     }
 
+    // Add Easy Apply filter
+    const easyApply = params.easyApplyOnly ? '&f_LF=f_AL' : '';
+
     // Add remote filter if set
     const remote = params.remoteOption ? '&f_WT=2' : '';
 
     // Construct the full URL
-    return `https://www.linkedin.com/jobs/search/?keywords=${keywords}${location}${expLevel}${jobType}${datePosted}${remote}`;
+    return `https://www.linkedin.com/jobs/search/?keywords=${keywords}${location}${expLevel}${jobType}${datePosted}${remote}${easyApply}`;
+  };
+
+  const handleAutoApply = async () => {
+    try {
+      // Get active tab
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = tabs[0];
+
+      // Verify we're on a LinkedIn search results page
+      if (!tab.url?.includes('linkedin.com/jobs/search')) {
+        appendMessage({
+          actor: Actors.SYSTEM,
+          content: 'Please navigate to a LinkedIn job search results page before using Auto Apply.',
+          timestamp: Date.now(),
+        });
+        return;
+      }
+
+      // Start the auto-apply process with the agent
+      appendMessage({
+        actor: Actors.SYSTEM,
+        content: `Starting Auto Apply process. The assistant will automatically apply to Easy Apply jobs on this page using your resume and preferences. All applications will happen in the current tab.`,
+        timestamp: Date.now(),
+      });
+
+      // Send a user message to the agent with explicit instruction to stay in the current tab
+      handleSendMessage(
+        `Please apply to all Easy Apply jobs on this page that match my qualifications. Use my uploaded resume. Skip any jobs that require assessment tests or have more than 3 application steps. IMPORTANT: Do NOT open any new tabs or navigate away from this page - all actions must happen in the current tab.`,
+      );
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error('Auto Apply error', errorMessage);
+      appendMessage({
+        actor: Actors.SYSTEM,
+        content: errorMessage,
+        timestamp: Date.now(),
+      });
+    }
   };
 
   return (
@@ -775,6 +818,13 @@ const SidePanel = () => {
                         onClick={handleApplyNow}
                         className={`w-full py-3 px-4 rounded-full font-medium bg-purple-500 hover:bg-purple-600 text-white transition-colors duration-200`}>
                         Apply Now
+                      </button>
+
+                      <button
+                        onClick={handleAutoApply}
+                        disabled={isDisabled}
+                        className="py-2 px-4 rounded bg-green-600 hover:bg-green-500 text-white">
+                        Auto Apply
                       </button>
                     </div>
                   </div>

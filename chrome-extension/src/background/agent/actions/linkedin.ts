@@ -17,6 +17,7 @@ export function createLinkedInSearchAction(context: any): Action {
       companyId?: string;
       datePosted?: string;
       remoteOption?: boolean;
+      easyApplyOnly?: boolean;
     }) => {
       // Build the LinkedIn URL with parameters
       const keywords = encodeURIComponent(input.query || 'jobs');
@@ -71,8 +72,11 @@ export function createLinkedInSearchAction(context: any): Action {
       // Add remote filter if set
       const remote = input.remoteOption ? '&f_WT=2' : '';
 
+      // Add Easy Apply filter if requested
+      const easyApply = input.easyApplyOnly ? '&f_LF=f_AL' : '';
+
       // Construct the full URL
-      const linkedInUrl = `https://www.linkedin.com/jobs/search/?keywords=${keywords}${location}${expLevel}${jobType}${salary}${companyId}${datePosted}${remote}`;
+      const linkedInUrl = `https://www.linkedin.com/jobs/search/?keywords=${keywords}${location}${expLevel}${jobType}${salary}${companyId}${datePosted}${remote}${easyApply}`;
 
       const msg = `Navigating to LinkedIn job search for "${input.query}"`;
       context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_START, msg);
@@ -80,7 +84,7 @@ export function createLinkedInSearchAction(context: any): Action {
       const page = await context.browserContext.getCurrentPage();
       await page.navigateTo(linkedInUrl);
 
-      const msg2 = `Successfully navigated to LinkedIn job search with parameters: keywords=${input.query}${location ? ', location=' + input.location : ''}${expLevel ? ', experience level=' + input.experienceLevel : ''}${jobType ? ', job type=' + input.jobType : ''}${datePosted ? ', date posted=' + input.datePosted : ''}${remote ? ', remote=true' : ''}`;
+      const msg2 = `Successfully navigated to LinkedIn job search with parameters: keywords=${input.query}${location ? ', location=' + input.location : ''}${expLevel ? ', experience level=' + input.experienceLevel : ''}${jobType ? ', job type=' + input.jobType : ''}${datePosted ? ', date posted=' + input.datePosted : ''}${remote ? ', remote=true' : ''}${easyApply ? ', easy apply=true' : ''}`;
       context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_OK, msg2);
 
       return new ActionResult({
@@ -98,3 +102,6 @@ export {
   createLinkedInFillApplicationAction,
   createLinkedInSubmitApplicationAction,
 } from './linkedin_apply';
+
+// Add this export alongside your existing exports
+export { createLinkedInAutoApplyAction } from './linkedin_auto_apply';

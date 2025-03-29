@@ -262,7 +262,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function handleDirectLinkedInSearch(params) {
-  // Build the LinkedIn URL with parameters directly
+  // Build the LinkedIn URL with parameters
   const keywords = encodeURIComponent(params.query || 'jobs');
   const location = params.location ? `&location=${encodeURIComponent(params.location)}` : '';
 
@@ -313,13 +313,28 @@ async function handleDirectLinkedInSearch(params) {
 
   const remote = params.remoteOption ? '&f_WT=2' : '';
 
+  // Add Easy Apply filter
+  const easyApply = params.easyApplyOnly ? '&f_LF=f_AL' : '';
+
   // Construct the full URL
-  const linkedInUrl = `https://www.linkedin.com/jobs/search/?keywords=${keywords}${location}${expLevel}${jobType}${datePosted}${remote}`;
+  const linkedInUrl = `https://www.linkedin.com/jobs/search/?keywords=${keywords}${location}${expLevel}${jobType}${datePosted}${remote}${easyApply}`;
 
-  // Open the LinkedIn search URL in a new tab
-  await chrome.tabs.create({ url: linkedInUrl });
+  // Check for existing LinkedIn job search tabs
+  const tabs = await chrome.tabs.query({});
+  const linkedInJobTab = tabs.find(tab => tab.url?.includes('linkedin.com/jobs/search'));
 
-  console.log(`Opened LinkedIn search in new tab: ${linkedInUrl}`);
+  if (linkedInJobTab && linkedInJobTab.id) {
+    // Update the existing tab instead of creating a new one
+    await chrome.tabs.update(linkedInJobTab.id, {
+      url: linkedInUrl,
+      active: true, // Focus this tab
+    });
+    console.log(`Updated existing LinkedIn job search tab: ${linkedInUrl}`);
+  } else {
+    // If no LinkedIn job tab exists, create a new one
+    await chrome.tabs.create({ url: linkedInUrl });
+    console.log(`Opened LinkedIn search in new tab: ${linkedInUrl}`);
+  }
 }
 
 // Add this function definition if the import isn't working
@@ -371,8 +386,11 @@ function createLinkedInSearchUrl(params: any): string {
     if (date) datePosted = `&f_TPR=${date}`;
   }
 
+  // Add Easy Apply filter
+  const easyApply = params.easyApplyOnly ? '&f_LF=f_AL' : '';
+
   // Construct the full URL
-  const linkedInUrl = `https://www.linkedin.com/jobs/search/?keywords=${keywords}${location}${expLevel}${jobType}${datePosted}`;
+  const linkedInUrl = `https://www.linkedin.com/jobs/search/?keywords=${keywords}${location}${expLevel}${jobType}${datePosted}${easyApply}`;
 
   return linkedInUrl;
 }

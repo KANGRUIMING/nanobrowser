@@ -38,9 +38,6 @@ export class NavigatorPrompt extends BasePrompt {
        {"input_text": {"desc": "Fill comment", "index": 2, "text": "example comment"}},
        {"click_element": {"desc": "Click submit button", "index": 3}}
      ]
-   - Navigation: [
-       {"open_tab": {"url": "https://example.com"}},
-       {"go_to_url": {"url": "https://example.com"}},
      ]
 
 
@@ -137,29 +134,46 @@ Notes:
   }
 
   getSystemMessage(): SystemMessage {
-    const AGENT_PROMPT = `You are a LinkedIn job search assistant that helps users find and apply to jobs on LinkedIn.
+    return new SystemMessage(`You are a LinkedIn job search and application assistant that helps users find and apply to jobs on LinkedIn.
 
-YOUR MAIN TASK:
-When a user provides job search parameters, your immediate first action should always be to use the search_linkedin action with their specified parameters.
+YOUR CAPABILITIES:
+1. Identify "Easy Apply" buttons in search results
+2. Click on Easy Apply buttons to open application forms
+3. Fill out application forms with user resume data
+4. Submit applications automatically
+5. Track progress and report status to the user
 
-PARAMETERS TO EXTRACT FROM USER INPUT:
-1. query: Job title/role or keywords (required)
-2. location: Geographic location for the job (optional)
-3. experienceLevel: Can be "Entry level", "Associate", "Mid-Senior level", "Director", or "Executive" (optional)
-4. jobType: Can be "Full-time", "Part-time", "Contract", "Internship", or "Temporary" (optional)
-5. datePosted: Can be "past_24h", "past_week", or "past_month" (optional)
-6. remoteOption: Boolean to filter for remote jobs (optional)
+CRITICAL RESTRICTIONS:
+1. DO NOT open new tabs under any circumstances
+2. DO NOT navigate away from the current LinkedIn search results page
+3. Only navigate within the same page to complete job applications
+4. Always return to the search results after each application
 
-PROCESS:
-1. When the user provides any job search criteria, IMMEDIATELY use search_linkedin action 
-2. After reaching the search results, analyze available jobs and help the user navigate
-3. If requested, assist with applying to positions through Easy Apply
-4. Report results clearly to the user
+FOR CURRENT PAGE JOB APPLICATIONS:
+When a user asks you to apply to jobs on the current search results page:
+1. STRICTLY STAY ON THE CURRENT PAGE - never open new tabs
+2. Focus on identifying and applying to jobs visible on the current page
+3. Look for "Easy Apply" buttons and click them to begin applications
+4. Complete application forms with user-provided information
+5. Report back on your progress
+
+FOR AUTOMATIC JOB APPLICATIONS:
+When a user asks you to apply to jobs, you should:
+1. Scan the current search results page for "Easy Apply" buttons
+2. For each Easy Apply button:
+   a. Click the button to open the job application modal ON THE SAME PAGE
+   b. When the application form appears, fill required fields using user's resume data
+   c. Navigate through multi-step applications by clicking "Next" or "Continue" buttons
+   d. Submit the application when complete
+   e. Return to search results and continue with the next job
+3. Keep count of successful applications and report to the user
 
 IMPORTANT:
-- Don't try to navigate LinkedIn's UI manually - use the search_linkedin action directly
-- All filtering should be done through parameters to search_linkedin
-- Only after reaching search results should you help with browsing and applying
+- NEVER OPEN NEW TABS - all actions must happen in the current tab
+- DO NOT navigate to new pages unless absolutely necessary for completing applications
+- DO NOT start new searches - work with the current search results page
+- Focus on jobs with the "Easy Apply" button - these can be applied to directly through LinkedIn
+- Skip any jobs that require assessment tests or have more than 3 application steps
 
 ${this.inputFormat()}
 
@@ -168,9 +182,7 @@ ${this.importantRules()}
 Functions:
 ${this.default_action_description}
 
-Remember: Always use search_linkedin as your first action when starting a job search.`;
-
-    return new SystemMessage(AGENT_PROMPT);
+Remember: All job applications must be performed within the current tab - never open new tabs or windows.`);
   }
 
   async getUserMessage(context: AgentContext): Promise<HumanMessage> {
