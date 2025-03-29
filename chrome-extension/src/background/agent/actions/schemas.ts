@@ -16,9 +16,20 @@ export const doneActionSchema: ActionSchema = {
 
 export const searchLinkedInActionSchema: ActionSchema = {
   name: 'search_linkedin',
-  description: 'Search LinkedIn in the current tab',
+  description: 'Navigate directly to LinkedIn job search with specified parameters',
   schema: z.object({
-    query: z.string(),
+    query: z.string().describe('Job title or keywords'),
+    location: z.string().optional().describe('Job location (e.g., "Austin, Texas")'),
+    experienceLevel: z
+      .string()
+      .optional()
+      .describe('Experience level: "Entry level", "Associate", "Mid-Senior level", "Director", or "Executive"'),
+    jobType: z
+      .string()
+      .optional()
+      .describe('Job type: "Full-time", "Part-time", "Contract", "Internship", or "Temporary"'),
+    salary: z.string().optional().describe('Salary filter (e.g., "100000")'),
+    companyId: z.string().optional().describe('Company ID for filtering by company'),
   }),
 };
 
@@ -155,3 +166,18 @@ export const selectDropdownOptionActionSchema: ActionSchema = {
     text: z.string(),
   }),
 };
+
+export const linkedInEasyApplySchema = z.object({
+  jobId: z.string().optional().describe('The job ID to apply for (if known)'),
+  resumeText: z.string().optional().describe('Resume text to use in the application'),
+  useDefaultResume: z.boolean().optional().describe('Whether to use the default resume already uploaded to LinkedIn'),
+});
+
+export const linkedInFillApplicationSchema = z.object({
+  fieldIndexes: z.array(z.number()).describe('The indexes of the form fields to fill'),
+  values: z.array(z.string()).describe('The values to put in each field'),
+});
+
+export const linkedInSubmitApplicationSchema = z.object({
+  confirm: z.boolean().describe('Set to true to confirm submission'),
+});

@@ -137,20 +137,24 @@ Notes:
   }
 
   getSystemMessage(): SystemMessage {
-    /**
-     * Get the system prompt for the agent.
-     *
-     * @returns SystemMessage containing the formatted system prompt
-     */
-    const AGENT_PROMPT = `You are a helpful web navigation assistant.
+    const AGENT_PROMPT = `You are a LinkedIn job search specialist.
 
-IMPORTANT INSTRUCTIONS:
-1. No matter what the user task is, ALWAYS perform a LinkedIn job search as your first action
-2. Extract the job title and location from the user's input
-3. Use the searchLinkedIn action with these parameters
-4. If job title or location isn't specified, use a generic term like "jobs" or leave location blank
-5. Only perform actions on LinkedIn websites - never suggest or navigate to other websites
-6. If the user asks to go to a non-LinkedIn site, politely inform them you can only work with LinkedIn
+CRITICAL INSTRUCTIONS:
+1. Your ONLY job is to navigate directly to the LinkedIn jobs search URL as your first and only action
+2. ALWAYS use this exact URL format: https://www.linkedin.com/jobs/search/?keywords=[KEYWORDS]&location=[LOCATION]&f_E=[EXPERIENCE_LEVEL]&f_JT=[JOB_TYPE]
+3. Extract these parameters from the user input:
+   - [KEYWORDS]: Job title (e.g., "Software Engineer")
+   - [LOCATION]: Location (e.g., "Austin, Texas")
+   - [EXPERIENCE_LEVEL]: Experience level (1=Entry, 2=Associate, 3=Mid-Senior, 4=Director, 5=Executive)
+   - [JOB_TYPE]: Job type (FULLTIME, PARTTIME, CONTRACT, INTERNSHIP)
+4. If any parameter is missing, use these defaults:
+   - Keywords: "jobs" 
+   - Other parameters: omit from URL if not specified
+5. No matter what the user asks, ALWAYS use the searchLinkedIn action with these parameters
+6. Do not perform any other actions - your sole purpose is to construct this URL
+
+Example for "Software Engineer" in "Austin, Texas" with Mid-Senior level and Full-time:
+https://www.linkedin.com/jobs/search/?keywords=Software%20Engineer&location=Austin%2C%20Texas&f_E=3&f_JT=FULLTIME
 
 ${this.inputFormat()}
 
@@ -159,7 +163,7 @@ ${this.importantRules()}
 Functions:
 ${this.default_action_description}
 
-Remember: Your responses must be valid JSON matching the specified format. Each action in the sequence must be valid.`;
+Remember: Your ONLY job is to navigate to the LinkedIn jobs search URL with the appropriate parameters.`;
 
     return new SystemMessage(AGENT_PROMPT);
   }
