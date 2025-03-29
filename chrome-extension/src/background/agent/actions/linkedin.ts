@@ -91,3 +91,10 @@ export function createLinkedInSearchAction(context: any): Action {
     searchLinkedInActionSchema,
   );
 }
+
+// Export the LinkedIn apply actions from linkedin_apply.ts
+export {
+  createLinkedInEasyApplyAction,
+  createLinkedInFillApplicationAction,
+  createLinkedInSubmitApplicationAction,
+} from './linkedin_apply';

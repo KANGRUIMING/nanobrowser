@@ -539,47 +539,50 @@ const SidePanel = () => {
     }
   };
 
-  const handleApplyNow = () => {
-    // Ensure role doesn't exceed 30 characters
-    const trimmedRole = role.trim().substring(0, 30);
+  const handleApplyNow = async () => {
+    try {
+      // Ensure role doesn't exceed 30 characters
+      const trimmedRole = role.trim().substring(0, 30);
 
-    // Build search string from role and position type
-    const searchString =
-      trimmedRole && positionType
-        ? `${trimmedRole} ${positionType}`
-        : trimmedRole || (positionType ? `${positionType} job` : 'job');
+      // Determine search parameters
+      const searchParams = {
+        query: trimmedRole || (positionType ? `${positionType} job` : 'job'),
+        location: preferredLocation.trim() || undefined,
+        experienceLevel: positionType || undefined,
+        datePosted: selectedDatePosted !== 'any' ? selectedDatePosted : undefined,
+        remoteOption: isRemote,
+      };
 
-    // Start building the message
-    let message = `I'm looking for a ${searchString}`;
+      // Add a message to show that the search is being initiated
+      appendMessage({
+        actor: Actors.SYSTEM,
+        content: `Opening LinkedIn job search in a new tab for: ${searchParams.query} ${searchParams.location ? 'in ' + searchParams.location : ''} ${searchParams.datePosted ? '(' + searchParams.datePosted.replace('_', ' ') + ')' : ''} ${searchParams.remoteOption ? '(Remote)' : ''}`,
+        timestamp: Date.now(),
+      });
 
-    // Add date posted if selected
-    if (selectedDatePosted && selectedDatePosted !== 'any') {
-      message += `, ${getDatePostedText(selectedDatePosted)}`;
+      // Try direct navigation as a fallback if messaging fails
+      try {
+        // First try sending a message to the background script
+        await chrome.runtime.sendMessage({
+          type: 'direct_linkedin_search',
+          params: searchParams,
+        });
+      } catch (msgError) {
+        console.log('Background messaging failed, using direct navigation fallback');
+
+        // If messaging fails, construct the URL and open it directly
+        const url = createLinkedInSearchUrl(searchParams);
+        window.open(url, '_blank');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error('Navigation error', errorMessage);
+      appendMessage({
+        actor: Actors.SYSTEM,
+        content: errorMessage,
+        timestamp: Date.now(),
+      });
     }
-
-    // Add location if provided
-    if (preferredLocation.trim()) {
-      message += `, in ${preferredLocation.trim()}`;
-    }
-
-    // Add remote preference
-    message += `, with Remote? set to ${isRemote ? 'Yes' : 'No'}`;
-
-    // Add Easy Apply reference
-    message += `. Use Easy Apply.`;
-
-    // Add explicit automation instructions
-    message += ` Please go to the LinkedIn search tab, type "${searchString}", and then navigate through the search result filters (date posted, remote, etc.) to match these preferences.`;
-
-    // Add resume text if provided
-    if (resumeText) {
-      message += '\n\nHere is my resume:\n' + resumeText;
-    }
-
-    message += '\n\nCan you help me apply to suitable jobs that match my preferences and qualifications?';
-
-    // Send the message using the existing function
-    handleSendMessage(message);
   };
 
   // Create a custom handler for the resume input
@@ -599,6 +602,69 @@ const SidePanel = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Add this function in the component (or extract to a separate file if preferred)
+  const createLinkedInSearchUrl = (params: {
+    query: string;
+    location?: string;
+    experienceLevel?: string;
+    jobType?: string;
+    datePosted?: string;
+    remoteOption?: boolean;
+  }): string => {
+    // Build the LinkedIn URL with parameters
+    const keywords = encodeURIComponent(params.query || 'jobs');
+    const location = params.location ? `&location=${encodeURIComponent(params.location)}` : '';
+
+    // Map experience level from text to LinkedIn's numeric codes
+    let expLevel = '';
+    if (params.experienceLevel) {
+      const expMap: { [key: string]: string } = {
+        'entry level': '1',
+        associate: '2',
+        'mid-senior level': '3',
+        director: '4',
+        executive: '5',
+        // Map UI options to LinkedIn parameters
+        internship: '1',
+        'full-time': '3', // Map full-time to mid-senior as a default
+      };
+      const level = expMap[params.experienceLevel.toLowerCase()];
+      if (level) expLevel = `&f_E=${level}`;
+    }
+
+    // Map job type to LinkedIn's format
+    let jobType = '';
+    if (params.jobType) {
+      const jobMap: { [key: string]: string } = {
+        'full-time': 'FULLTIME',
+        'part-time': 'PARTTIME',
+        contract: 'CONTRACT',
+        internship: 'INTERNSHIP',
+        temporary: 'TEMPORARY',
+      };
+      const type = jobMap[params.jobType.toLowerCase()];
+      if (type) jobType = `&f_JT=${type}`;
+    }
+
+    // Add date posted filter if provided
+    let datePosted = '';
+    if (params.datePosted) {
+      const dateMap: { [key: string]: string } = {
+        past_24h: 'r86400',
+        past_week: 'r604800',
+        past_month: 'r2592000',
+      };
+      const date = dateMap[params.datePosted];
+      if (date) datePosted = `&f_TPR=${date}`;
+    }
+
+    // Add remote filter if set
+    const remote = params.remoteOption ? '&f_WT=2' : '';
+
+    // Construct the full URL
+    return `https://www.linkedin.com/jobs/search/?keywords=${keywords}${location}${expLevel}${jobType}${datePosted}${remote}`;
+  };
 
   return (
     <div>

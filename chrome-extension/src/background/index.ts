@@ -1,3 +1,4 @@
+import { createLinkedInSearchUrl } from './linkedin-search';
 import 'webextension-polyfill';
 import { agentModelStore, AgentNameEnum, generalSettingsStore, llmProviderStore } from '@extension/storage';
 import BrowserContext from './browser/context';
@@ -237,4 +238,111 @@ async function subscribeToExecutorEvents(executor: Executor) {
       await currentExecutor?.cleanup();
     }
   });
+}
+
+// Add or ensure this code exists in your background script entry point
+chrome.runtime.onInstalled.addListener(() => {
+  console.log('LinkedIn extension installed/updated');
+});
+
+// Make sure the runtime message listener is set up properly
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('Received message in background:', message.type);
+
+  if (message.type === 'direct_linkedin_search') {
+    handleDirectLinkedInSearch(message.params).catch(err => {
+      console.error('Failed to navigate to LinkedIn search:', err);
+      sendResponse({ success: false, error: err.message });
+    });
+    return true; // Indicate we'll handle this asynchronously
+  }
+
+  // Other message handlers...
+  return false;
+});
+
+async function handleDirectLinkedInSearch(params) {
+  // Build the LinkedIn URL with parameters directly
+  const keywords = encodeURIComponent(params.query || 'jobs');
+  const location = params.location ? `&location=${encodeURIComponent(params.location)}` : '';
+  const expLevel =
+    params.experienceLevel?.toLowerCase() === 'internship'
+      ? '&f_E=1'
+      : params.experienceLevel?.toLowerCase() === 'full-time'
+        ? '&f_E=3'
+        : '';
+  const jobType = params.jobType ? `&f_JT=${params.jobType.toUpperCase()}` : '';
+  const datePosted =
+    params.datePosted === 'past_24h'
+      ? '&f_TPR=r86400'
+      : params.datePosted === 'past_week'
+        ? '&f_TPR=r604800'
+        : params.datePosted === 'past_month'
+          ? '&f_TPR=r2592000'
+          : '';
+  const remote = params.remoteOption ? '&f_WT=2' : '';
+
+  // Construct the full URL
+  const linkedInUrl = `https://www.linkedin.com/jobs/search/?keywords=${keywords}${location}${expLevel}${jobType}${datePosted}${remote}`;
+
+  // Open the LinkedIn search URL in a new tab
+  await chrome.tabs.create({ url: linkedInUrl });
+
+  console.log(`Opened LinkedIn search in new tab: ${linkedInUrl}`);
+}
+
+// Add this function definition if the import isn't working
+function createLinkedInSearchUrl(params: any): string {
+  // Build the LinkedIn URL with parameters
+  const keywords = encodeURIComponent(params.query || 'jobs');
+  const location = params.location ? `&location=${encodeURIComponent(params.location)}` : '';
+
+  // Map experience level from text to LinkedIn's numeric codes
+  let expLevel = '';
+  if (params.experienceLevel) {
+    const expMap: { [key: string]: string } = {
+      'entry level': '1',
+      associate: '2',
+      'mid-senior level': '3',
+      director: '4',
+      executive: '5',
+      // Map UI options to LinkedIn parameters
+      internship: '1',
+      'full-time': '3', // Map full-time to mid-senior as a default
+    };
+    const level = expMap[params.experienceLevel.toLowerCase()];
+    if (level) expLevel = `&f_E=${level}`;
+  }
+
+  // Map job type to LinkedIn's format
+  let jobType = '';
+  if (params.jobType) {
+    const jobMap: { [key: string]: string } = {
+      'full-time': 'FULLTIME',
+      'part-time': 'PARTTIME',
+      contract: 'CONTRACT',
+      internship: 'INTERNSHIP',
+      temporary: 'TEMPORARY',
+    };
+    const type = jobMap[params.jobType.toLowerCase()];
+    if (type) jobType = `&f_JT=${type}`;
+  }
+
+  // Add date posted filter if provided
+  let datePosted = '';
+  if (params.datePosted) {
+    const dateMap: { [key: string]: string } = {
+      past_24h: 'r86400',
+      past_week: 'r604800',
+      past_month: 'r2592000',
+    };
+    const date = dateMap[params.datePosted];
+    if (date) datePosted = `&f_TPR=${date}`;
+  }
+
+  // Add remote filter if set
+  const remote = params.remoteOption ? '&f_WT=2' : '';
+
+  // Construct the full URL
+  return `https://www.linkedin.com/jobs/search/?keywords=${keywords}${location}${expLevel}${jobType}${datePosted}${remote}`;
 }

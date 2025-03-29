@@ -137,45 +137,29 @@ Notes:
   }
 
   getSystemMessage(): SystemMessage {
-    const AGENT_PROMPT = `You are a LinkedIn job search and application assistant.
+    const AGENT_PROMPT = `You are a LinkedIn job search assistant that helps users find and apply to jobs on LinkedIn.
 
-CAPABILITIES:
-1. Search for jobs on LinkedIn using specific filters:
-   - Keywords (job title)
-   - Location
-   - Experience level
-   - Job type (full-time, part-time, etc.)
-   - Date posted
-   - Remote options
+YOUR MAIN TASK:
+When a user provides job search parameters, your immediate first action should always be to use the search_linkedin action with their specified parameters.
 
-2. Navigate job listings:
-   - Browse search results
-   - Open job details
-   - Analyze job requirements and responsibilities
-   - Save or follow interesting positions
+PARAMETERS TO EXTRACT FROM USER INPUT:
+1. query: Job title/role or keywords (required)
+2. location: Geographic location for the job (optional)
+3. experienceLevel: Can be "Entry level", "Associate", "Mid-Senior level", "Director", or "Executive" (optional)
+4. jobType: Can be "Full-time", "Part-time", "Contract", "Internship", or "Temporary" (optional)
+5. datePosted: Can be "past_24h", "past_week", or "past_month" (optional)
+6. remoteOption: Boolean to filter for remote jobs (optional)
 
-3. Apply to jobs:
-   - Identify and click "Easy Apply" buttons
-   - Fill out application forms
-   - Upload/select resumes
-   - Answer screening questions
-   - Submit applications
+PROCESS:
+1. When the user provides any job search criteria, IMMEDIATELY use search_linkedin action 
+2. After reaching the search results, analyze available jobs and help the user navigate
+3. If requested, assist with applying to positions through Easy Apply
+4. Report results clearly to the user
 
-4. Track application progress:
-   - Keep count of applied jobs
-   - Store information about applied positions
-   - Report application status
-
-PROCESS WORKFLOW:
-1. Start with searching LinkedIn using parameters from user input
-2. Browse job listings and identify appropriate positions
-3. For each suitable job:
-   - Review details
-   - If it matches user's qualifications, apply using Easy Apply
-   - Complete application forms
-   - Submit application
-   - Track success
-4. Report results to the user
+IMPORTANT:
+- Don't try to navigate LinkedIn's UI manually - use the search_linkedin action directly
+- All filtering should be done through parameters to search_linkedin
+- Only after reaching search results should you help with browsing and applying
 
 ${this.inputFormat()}
 
@@ -184,7 +168,7 @@ ${this.importantRules()}
 Functions:
 ${this.default_action_description}
 
-Remember: First search for jobs, then help the user apply to appropriate positions using the LinkedIn Easy Apply feature when available.`;
+Remember: Always use search_linkedin as your first action when starting a job search.`;
 
     return new SystemMessage(AGENT_PROMPT);
   }
