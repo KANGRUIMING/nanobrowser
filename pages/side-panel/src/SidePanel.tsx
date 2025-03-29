@@ -42,17 +42,10 @@ const SidePanel = () => {
   const [isDisabled, setIsDisabled] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // Check for dark mode preference
+  // Check for dark mode preference - we're now forcing light mode
   useEffect(() => {
-    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    setIsDarkMode(darkModeMediaQuery.matches);
-
-    const handleChange = (e: MediaQueryListEvent) => {
-      setIsDarkMode(e.matches);
-    };
-
-    darkModeMediaQuery.addEventListener('change', handleChange);
-    return () => darkModeMediaQuery.removeEventListener('change', handleChange);
+    // Always use light mode
+    setIsDarkMode(false);
   }, []);
 
   useEffect(() => {
@@ -609,26 +602,24 @@ const SidePanel = () => {
 
   return (
     <div>
-      <div
-        className={`flex h-screen flex-col ${isDarkMode ? 'bg-slate-900' : "bg-[url('/bg.jpg')] bg-cover bg-no-repeat"} overflow-hidden border ${isDarkMode ? 'border-sky-800' : 'border-[rgb(186,230,253)]'} rounded-2xl`}>
+      <div className="flex h-screen flex-col bg-white overflow-hidden border border-gray-100 rounded-3xl shadow-sm">
         <header className="header relative">
           <div className="header-logo">
             {showHistory ? (
               <button
                 type="button"
                 onClick={handleBackToChat}
-                className={`${isDarkMode ? 'text-sky-400 hover:text-sky-300' : 'text-sky-400 hover:text-sky-500'} cursor-pointer`}
+                className={`text-purple-500 hover:text-purple-700 cursor-pointer`}
                 aria-label="Back to chat">
                 ← Back
               </button>
             ) : (
-              <img
-                src="/icon-128.png"
-                alt="Extension Logo"
-                className="size-6 cursor-pointer"
+              <span
+                className="text-2xl font-semibold text-purple-500 cursor-pointer"
                 onClick={handleNewChat}
-                title="Return to home"
-              />
+                title="Return to home">
+                Jawn
+              </span>
             )}
           </div>
           <div className="header-icons">
@@ -638,7 +629,7 @@ const SidePanel = () => {
                   type="button"
                   onClick={handleNewChat}
                   onKeyDown={e => e.key === 'Enter' && handleNewChat()}
-                  className={`header-icon ${isDarkMode ? 'text-sky-400 hover:text-sky-300' : 'text-sky-400 hover:text-sky-500'} cursor-pointer`}
+                  className={`header-icon text-gray-700 hover:text-gray-900 cursor-pointer`}
                   aria-label="New Chat"
                   tabIndex={0}>
                   <PiPlusBold size={20} />
@@ -647,7 +638,7 @@ const SidePanel = () => {
                   type="button"
                   onClick={handleLoadHistory}
                   onKeyDown={e => e.key === 'Enter' && handleLoadHistory()}
-                  className={`header-icon ${isDarkMode ? 'text-sky-400 hover:text-sky-300' : 'text-sky-400 hover:text-sky-500'} cursor-pointer`}
+                  className={`header-icon text-gray-700 hover:text-gray-900 cursor-pointer`}
                   aria-label="Load History"
                   tabIndex={0}>
                   <GrHistory size={20} />
@@ -658,14 +649,14 @@ const SidePanel = () => {
               href="https://discord.gg/NN3ABHggMK"
               target="_blank"
               rel="noopener noreferrer"
-              className={`header-icon ${isDarkMode ? 'text-sky-400 hover:text-sky-300' : 'text-sky-400 hover:text-sky-500'}`}>
+              className={`header-icon text-gray-700 hover:text-gray-900`}>
               <RxDiscordLogo size={20} />
             </a>
             <button
               type="button"
               onClick={() => chrome.runtime.openOptionsPage()}
               onKeyDown={e => e.key === 'Enter' && chrome.runtime.openOptionsPage()}
-              className={`header-icon ${isDarkMode ? 'text-sky-400 hover:text-sky-300' : 'text-sky-400 hover:text-sky-500'} cursor-pointer`}
+              className={`header-icon text-gray-700 hover:text-gray-900 cursor-pointer`}
               aria-label="Settings"
               tabIndex={0}>
               <FiSettings size={20} />
@@ -691,31 +682,32 @@ const SidePanel = () => {
                     <div className="w-full max-w-sm space-y-4">
                       <button
                         onClick={handleSetJobPreferences}
-                        className={`w-full py-3 px-4 rounded-lg font-medium ${
-                          isDarkMode
-                            ? 'bg-sky-600 hover:bg-sky-500 text-white'
-                            : 'bg-sky-500 hover:bg-sky-400 text-white'
-                        } transition-colors duration-200`}>
+                        className={`w-full py-3 px-4 rounded-full font-medium bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 transition-colors duration-200`}>
                         Set Job Preferences
                       </button>
 
                       <button
                         onClick={handleUploadResume}
-                        className={`w-full py-3 px-4 rounded-lg font-medium ${
-                          isDarkMode
-                            ? 'bg-slate-700 hover:bg-slate-600 text-white'
-                            : 'bg-white hover:bg-gray-100 text-sky-600 border border-sky-200'
-                        } transition-colors duration-200`}>
+                        className={`w-full py-3 px-4 rounded-full font-medium flex items-center justify-center bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 transition-colors duration-200`}>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5 mr-2"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12"
+                          />
+                        </svg>
                         Upload Resume
                       </button>
 
                       <button
                         onClick={handleApplyNow}
-                        className={`w-full py-3 px-4 rounded-lg font-medium ${
-                          isDarkMode
-                            ? 'bg-green-600 hover:bg-green-500 text-white'
-                            : 'bg-green-500 hover:bg-green-400 text-white'
-                        } transition-colors duration-200`}>
+                        className={`w-full py-3 px-4 rounded-full font-medium bg-purple-500 hover:bg-purple-600 text-white transition-colors duration-200`}>
                         Apply Now
                       </button>
                     </div>
