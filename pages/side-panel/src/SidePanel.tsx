@@ -28,6 +28,9 @@ const SidePanel = () => {
   const [jobLocation, setJobLocation] = useState('');
   const [selectedExperienceLevels, setSelectedExperienceLevels] = useState<string[]>([]);
   const [selectedSalary, setSelectedSalary] = useState('');
+  const [showJobPreferences, setShowJobPreferences] = useState(false);
+  const [showUploadResume, setShowUploadResume] = useState(false);
+  const [resumeText, setResumeText] = useState('');
   const sessionIdRef = useRef<string | null>(null);
   const portRef = useRef<chrome.runtime.Port | null>(null);
   const heartbeatIntervalRef = useRef<number | null>(null);
@@ -498,6 +501,26 @@ const SidePanel = () => {
     setSelectedExperienceLevels(prev => (prev.includes(level) ? prev.filter(l => l !== level) : [...prev, level]));
   };
 
+  const handleSetJobPreferences = () => {
+    setShowJobPreferences(true);
+    setShowUploadResume(false);
+  };
+
+  const handleUploadResume = () => {
+    setShowUploadResume(true);
+    setShowJobPreferences(false);
+  };
+
+  const handleApplyNow = () => {
+    // Implementation for apply now functionality
+    console.log('Apply Now clicked');
+  };
+
+  // Create a custom handler for the resume input
+  const handleResumeInputChange = (text: string) => {
+    setResumeText(text);
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -582,8 +605,238 @@ const SidePanel = () => {
           </div>
         ) : (
           <>
-            {messages.length === 0 && (
+            {messages.length === 0 ? (
               <>
+                {!showJobPreferences && !showUploadResume ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-4">
+                    <div className="w-full max-w-sm space-y-4">
+                      <button
+                        onClick={handleSetJobPreferences}
+                        className={`w-full py-3 px-4 rounded-lg font-medium ${
+                          isDarkMode
+                            ? 'bg-sky-600 hover:bg-sky-500 text-white'
+                            : 'bg-sky-500 hover:bg-sky-400 text-white'
+                        } transition-colors duration-200`}>
+                        Set Job Preferences
+                      </button>
+
+                      <button
+                        onClick={handleUploadResume}
+                        className={`w-full py-3 px-4 rounded-lg font-medium ${
+                          isDarkMode
+                            ? 'bg-slate-700 hover:bg-slate-600 text-white'
+                            : 'bg-white hover:bg-gray-100 text-sky-600 border border-sky-200'
+                        } transition-colors duration-200`}>
+                        Upload Resume
+                      </button>
+
+                      <button
+                        onClick={handleApplyNow}
+                        className={`w-full py-3 px-4 rounded-lg font-medium ${
+                          isDarkMode
+                            ? 'bg-green-600 hover:bg-green-500 text-white'
+                            : 'bg-green-500 hover:bg-green-400 text-white'
+                        } transition-colors duration-200`}>
+                        Apply Now
+                      </button>
+                    </div>
+                  </div>
+                ) : showUploadResume ? (
+                  <div className="flex-1 flex flex-col">
+                    <div
+                      className={`border-t ${isDarkMode ? 'border-sky-900' : 'border-sky-100'} p-2 shadow-sm backdrop-blur-sm`}>
+                      <ChatInput
+                        onSendMessage={handleSendMessage}
+                        onStopTask={handleStopTask}
+                        disabled={!inputEnabled || isHistoricalSession}
+                        showStopButton={showStopButton}
+                        initialContent={resumeText}
+                        setContent={setter => {
+                          setInputTextRef.current = setter;
+                        }}
+                        onChange={handleResumeInputChange}
+                        isDarkMode={isDarkMode}
+                      />
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4">
+                      <div className="text-center mb-4">
+                        <p className={`text-lg font-medium ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                          Upload your resume or paste its content
+                        </p>
+                        <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          Type or paste your resume content in the chat box above
+                        </p>
+                      </div>
+                      <div className="flex justify-center">
+                        <button
+                          onClick={() => {
+                            setShowUploadResume(false);
+                          }}
+                          className={`py-2 px-4 rounded ${
+                            isDarkMode
+                              ? 'bg-slate-700 hover:bg-slate-600 text-white'
+                              : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                          }`}>
+                          Back
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col overflow-y-auto">
+                    <div className="p-1 flex-1">
+                      <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                        <label
+                          htmlFor="jobTitle"
+                          className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-1`}>
+                          Job Title
+                        </label>
+                        <input
+                          id="jobTitle"
+                          type="text"
+                          value={jobTitle}
+                          onChange={e => setJobTitle(e.target.value)}
+                          placeholder="Enter your job title"
+                          className={`w-full px-3 py-2 rounded-md border ${
+                            isDarkMode
+                              ? 'bg-slate-800 border-sky-800 text-white placeholder-gray-400'
+                              : 'bg-white border-sky-200 text-gray-800 placeholder-gray-500'
+                          } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-sky-500' : 'focus:ring-sky-300'}`}
+                        />
+                      </div>
+                      <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                        <label
+                          className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-2`}>
+                          Job Type
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {jobTypes.map(jobType => (
+                            <div key={jobType} className="flex items-center">
+                              <input
+                                id={`jobType-${jobType}`}
+                                type="checkbox"
+                                checked={selectedJobTypes.includes(jobType)}
+                                onChange={() => toggleJobType(jobType)}
+                                className={`h-4 w-4 rounded ${
+                                  isDarkMode
+                                    ? 'border-sky-700 bg-slate-700 text-sky-500'
+                                    : 'border-sky-300 text-sky-600'
+                                } focus:ring-2 focus:ring-sky-400`}
+                              />
+                              <label htmlFor={`jobType-${jobType}`} className="ml-2 block text-sm">
+                                {jobType}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                        <label
+                          htmlFor="jobLocation"
+                          className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-1`}>
+                          Job Location
+                        </label>
+                        <input
+                          id="jobLocation"
+                          type="text"
+                          value={jobLocation}
+                          onChange={e => setJobLocation(e.target.value)}
+                          placeholder="Enter job location or 'Remote'"
+                          className={`w-full px-3 py-2 rounded-md border ${
+                            isDarkMode
+                              ? 'bg-slate-800 border-sky-800 text-white placeholder-gray-400'
+                              : 'bg-white border-sky-200 text-gray-800 placeholder-gray-500'
+                          } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-sky-500' : 'focus:ring-sky-300'}`}
+                        />
+                      </div>
+                      <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                        <label
+                          className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-2`}>
+                          Experience Level
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {experienceLevels.map(level => (
+                            <div key={level} className="flex items-center">
+                              <input
+                                id={`experienceLevel-${level}`}
+                                type="checkbox"
+                                checked={selectedExperienceLevels.includes(level)}
+                                onChange={() => toggleExperienceLevel(level)}
+                                className={`h-4 w-4 rounded ${
+                                  isDarkMode
+                                    ? 'border-sky-700 bg-slate-700 text-sky-500'
+                                    : 'border-sky-300 text-sky-600'
+                                } focus:ring-2 focus:ring-sky-400`}
+                              />
+                              <label htmlFor={`experienceLevel-${level}`} className="ml-2 block text-sm">
+                                {level}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                        <label
+                          className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-2`}>
+                          Salary
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {salaryOptions.map(salary => (
+                            <div key={salary} className="flex items-center">
+                              <input
+                                id={`salary-${salary}`}
+                                type="radio"
+                                name="salary"
+                                value={salary}
+                                checked={selectedSalary === salary}
+                                onChange={() => setSelectedSalary(salary)}
+                                className={`h-4 w-4 ${
+                                  isDarkMode
+                                    ? 'border-sky-700 bg-slate-700 text-sky-500'
+                                    : 'border-sky-300 text-sky-600'
+                                } focus:ring-2 focus:ring-sky-400`}
+                              />
+                              <label htmlFor={`salary-${salary}`} className="ml-2 block text-sm">
+                                {salary}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex justify-end px-3 mb-4">
+                        <button
+                          onClick={() => setShowJobPreferences(false)}
+                          className={`mr-2 py-2 px-4 rounded ${
+                            isDarkMode
+                              ? 'bg-slate-700 hover:bg-slate-600 text-white'
+                              : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                          }`}>
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => {
+                            // Save preferences and return to initial view
+                            setShowJobPreferences(false);
+                          }}
+                          className={`py-2 px-4 rounded ${
+                            isDarkMode
+                              ? 'bg-sky-600 hover:bg-sky-500 text-white'
+                              : 'bg-sky-500 hover:bg-sky-400 text-white'
+                          }`}>
+                          Save Preferences
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div
+                  className={`scrollbar-gutter-stable flex-1 overflow-x-hidden overflow-y-scroll scroll-smooth p-2 ${isDarkMode ? 'bg-slate-900/80' : ''}`}>
+                  <MessageList messages={messages} isDarkMode={isDarkMode} />
+                  <div ref={messagesEndRef} />
+                </div>
                 <div
                   className={`border-t ${isDarkMode ? 'border-sky-900' : 'border-sky-100'} p-2 shadow-sm backdrop-blur-sm`}>
                   <ChatInput
@@ -597,150 +850,7 @@ const SidePanel = () => {
                     isDarkMode={isDarkMode}
                   />
                 </div>
-                <div className="flex-1 overflow-y-auto">
-                  <div className="p-1">
-                    <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                      <label
-                        htmlFor="jobTitle"
-                        className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-1`}>
-                        Job Title
-                      </label>
-                      <input
-                        id="jobTitle"
-                        type="text"
-                        value={jobTitle}
-                        onChange={e => setJobTitle(e.target.value)}
-                        placeholder="Enter your job title"
-                        className={`w-full px-3 py-2 rounded-md border ${
-                          isDarkMode
-                            ? 'bg-slate-800 border-sky-800 text-white placeholder-gray-400'
-                            : 'bg-white border-sky-200 text-gray-800 placeholder-gray-500'
-                        } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-sky-500' : 'focus:ring-sky-300'}`}
-                      />
-                    </div>
-                    <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                      <label
-                        className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-2`}>
-                        Job Type
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {jobTypes.map(jobType => (
-                          <div key={jobType} className="flex items-center">
-                            <input
-                              id={`jobType-${jobType}`}
-                              type="checkbox"
-                              checked={selectedJobTypes.includes(jobType)}
-                              onChange={() => toggleJobType(jobType)}
-                              className={`h-4 w-4 rounded ${
-                                isDarkMode ? 'border-sky-700 bg-slate-700 text-sky-500' : 'border-sky-300 text-sky-600'
-                              } focus:ring-2 focus:ring-sky-400`}
-                            />
-                            <label htmlFor={`jobType-${jobType}`} className="ml-2 block text-sm">
-                              {jobType}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                      <label
-                        htmlFor="jobLocation"
-                        className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-1`}>
-                        Job Location
-                      </label>
-                      <input
-                        id="jobLocation"
-                        type="text"
-                        value={jobLocation}
-                        onChange={e => setJobLocation(e.target.value)}
-                        placeholder="Enter job location or 'Remote'"
-                        className={`w-full px-3 py-2 rounded-md border ${
-                          isDarkMode
-                            ? 'bg-slate-800 border-sky-800 text-white placeholder-gray-400'
-                            : 'bg-white border-sky-200 text-gray-800 placeholder-gray-500'
-                        } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-sky-500' : 'focus:ring-sky-300'}`}
-                      />
-                    </div>
-                    <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                      <label
-                        className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-2`}>
-                        Experience Level
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {experienceLevels.map(level => (
-                          <div key={level} className="flex items-center">
-                            <input
-                              id={`experienceLevel-${level}`}
-                              type="checkbox"
-                              checked={selectedExperienceLevels.includes(level)}
-                              onChange={() => toggleExperienceLevel(level)}
-                              className={`h-4 w-4 rounded ${
-                                isDarkMode ? 'border-sky-700 bg-slate-700 text-sky-500' : 'border-sky-300 text-sky-600'
-                              } focus:ring-2 focus:ring-sky-400`}
-                            />
-                            <label htmlFor={`experienceLevel-${level}`} className="ml-2 block text-sm">
-                              {level}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                      <label
-                        className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-2`}>
-                        Salary
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {salaryOptions.map(salary => (
-                          <div key={salary} className="flex items-center">
-                            <input
-                              id={`salary-${salary}`}
-                              type="radio"
-                              name="salary"
-                              value={salary}
-                              checked={selectedSalary === salary}
-                              onChange={() => setSelectedSalary(salary)}
-                              className={`h-4 w-4 ${
-                                isDarkMode ? 'border-sky-700 bg-slate-700 text-sky-500' : 'border-sky-300 text-sky-600'
-                              } focus:ring-2 focus:ring-sky-400`}
-                            />
-                            <label htmlFor={`salary-${salary}`} className="ml-2 block text-sm">
-                              {salary}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <TemplateList
-                        templates={defaultTemplates}
-                        onTemplateSelect={handleTemplateSelect}
-                        isDarkMode={isDarkMode}
-                      />
-                    </div>
-                  </div>
-                </div>
               </>
-            )}
-            <div
-              className={`scrollbar-gutter-stable flex-1 overflow-x-hidden overflow-y-scroll scroll-smooth p-2 ${isDarkMode ? 'bg-slate-900/80' : ''}`}>
-              <MessageList messages={messages} isDarkMode={isDarkMode} />
-              <div ref={messagesEndRef} />
-            </div>
-            {messages.length > 0 && (
-              <div
-                className={`border-t ${isDarkMode ? 'border-sky-900' : 'border-sky-100'} p-2 shadow-sm backdrop-blur-sm`}>
-                <ChatInput
-                  onSendMessage={handleSendMessage}
-                  onStopTask={handleStopTask}
-                  disabled={!inputEnabled || isHistoricalSession}
-                  showStopButton={showStopButton}
-                  setContent={setter => {
-                    setInputTextRef.current = setter;
-                  }}
-                  isDarkMode={isDarkMode}
-                />
-              </div>
             )}
           </>
         )}

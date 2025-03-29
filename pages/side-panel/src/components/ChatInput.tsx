@@ -7,6 +7,8 @@ interface ChatInputProps {
   showStopButton: boolean;
   setContent?: (setter: (text: string) => void) => void;
   isDarkMode?: boolean;
+  initialContent?: string;
+  onChange?: (text: string) => void;
 }
 
 export default function ChatInput({
@@ -16,8 +18,10 @@ export default function ChatInput({
   showStopButton,
   setContent,
   isDarkMode = false,
+  initialContent,
+  onChange,
 }: ChatInputProps) {
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialContent || '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Handle text changes and resize textarea
@@ -48,6 +52,20 @@ export default function ChatInput({
       textarea.style.height = `${Math.min(textarea.scrollHeight, 100)}px`;
     }
   }, []);
+
+  // Add effect to update content when initialContent changes
+  useEffect(() => {
+    if (initialContent !== undefined) {
+      setText(initialContent);
+    }
+  }, [initialContent]);
+
+  // Call onChange when content changes
+  useEffect(() => {
+    if (onChange) {
+      onChange(text);
+    }
+  }, [text, onChange]);
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
