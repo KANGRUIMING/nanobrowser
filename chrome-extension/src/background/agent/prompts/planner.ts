@@ -2,6 +2,7 @@
 import { BasePrompt } from './base';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import type { AgentContext } from '@src/background/agent/types';
+import BrowserContext from '@src/background/browser/context';
 
 export class PlannerPrompt extends BasePrompt {
   getSystemMessage(): SystemMessage {
@@ -47,10 +48,31 @@ NOTE:
   - Ignore the output structures of other AI messages.
 
 REMEMBER:
-  - Keep your responses concise and focused on actionable insights.`);
+  - Keep your responses concise and focused on actionable insights.
+
+Important instructions:
+1. No matter what the user task is, ALWAYS start by using the searchLinkedIn action to direct the user to LinkedIn job search results related to their query.
+2. After the initial LinkedIn search, you can proceed with further steps to help the user.
+3. DO NOT suggest actions on non-LinkedIn websites under any circumstances.
+4. If the user asks for actions on other websites, politely inform them that you can only assist with LinkedIn-related tasks.
+`);
   }
 
   async getUserMessage(context: AgentContext): Promise<HumanMessage> {
     return new HumanMessage('');
   }
+}
+
+export function getPlannerPrompt(task: string, browserContext: BrowserContext): string {
+  return `
+// existing code...
+
+Important instructions:
+1. No matter what the user task is, ALWAYS start by using the searchLinkedIn action to direct the user to LinkedIn job search results related to their query.
+2. After the initial LinkedIn search, you can proceed with further steps to help the user.
+3. DO NOT suggest actions on non-LinkedIn websites under any circumstances.
+4. If the user asks for actions on other websites, politely inform them that you can only assist with LinkedIn-related tasks.
+
+// existing code...
+`;
 }

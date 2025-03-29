@@ -36,6 +36,7 @@ const SidePanel = () => {
   const heartbeatIntervalRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const setInputTextRef = useRef<((text: string) => void) | null>(null);
+  const [isDisabled, setIsDisabled] = useState(false);
 
   // Check for dark mode preference
   useEffect(() => {
@@ -53,6 +54,33 @@ const SidePanel = () => {
   useEffect(() => {
     sessionIdRef.current = currentSessionId;
   }, [currentSessionId]);
+
+  useEffect(() => {
+    const checkIfLinkedIn = async () => {
+      // Get the current tab
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+      // Check if the current URL is LinkedIn
+      const isLinkedIn = tab.url && tab.url.includes('linkedin.com');
+
+      if (!isLinkedIn) {
+        // If not on LinkedIn, show a message or disable functionality
+        setIsDisabled(true);
+      } else {
+        setIsDisabled(false);
+      }
+    };
+
+    checkIfLinkedIn();
+    // Add a listener for tab changes
+    chrome.tabs.onActivated.addListener(checkIfLinkedIn);
+    chrome.tabs.onUpdated.addListener(checkIfLinkedIn);
+
+    return () => {
+      chrome.tabs.onActivated.removeListener(checkIfLinkedIn);
+      chrome.tabs.onUpdated.removeListener(checkIfLinkedIn);
+    };
+  }, []);
 
   const appendMessage = useCallback((newMessage: Message, sessionId?: string | null) => {
     // Don't save progress messages
@@ -871,8 +899,33 @@ const SidePanel = () => {
               <>
                 <div
                   className={`scrollbar-gutter-stable flex-1 overflow-x-hidden overflow-y-scroll scroll-smooth p-2 ${isDarkMode ? 'bg-slate-900/80' : ''}`}>
-                  <MessageList messages={messages} isDarkMode={isDarkMode} />
-                  <div ref={messagesEndRef} />
+                  {isDisabled ? (
+                    <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+                      <img src="/icon-128.png" alt="Extension Logo" className="w-16 h-16 mb-4" />
+                      <h3 className={`text-xl font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                        LinkedIn Assistant
+                      </h3>
+                      <p className={`mb-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        This assistant only works on LinkedIn websites. Please navigate to LinkedIn to use this feature.
+                      </p>
+                      <a
+                        href="https://www.linkedin.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`py-2 px-4 rounded ${
+                          isDarkMode
+                            ? 'bg-sky-600 hover:bg-sky-500 text-white'
+                            : 'bg-sky-500 hover:bg-sky-400 text-white'
+                        }`}>
+                        Go to LinkedIn
+                      </a>
+                    </div>
+                  ) : (
+                    <>
+                      <MessageList messages={messages} isDarkMode={isDarkMode} />
+                      <div ref={messagesEndRef} />
+                    </>
+                  )}
                 </div>
                 <div
                   className={`border-t ${isDarkMode ? 'border-sky-900' : 'border-sky-100'} p-2 shadow-sm backdrop-blur-sm`}>

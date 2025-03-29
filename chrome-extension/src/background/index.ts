@@ -50,9 +50,10 @@ async function injectBuildDomTree(tabId: number) {
   }
 }
 
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (tabId && changeInfo.status === 'complete' && tab.url?.startsWith('http')) {
-    await injectBuildDomTree(tabId);
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url?.includes('linkedin.com')) {
+    // Initialize agent and functionality
+    injectBuildDomTree(tabId);
   }
 });
 
