@@ -265,13 +265,43 @@ async function handleDirectLinkedInSearch(params) {
   // Build the LinkedIn URL with parameters directly
   const keywords = encodeURIComponent(params.query || 'jobs');
   const location = params.location ? `&location=${encodeURIComponent(params.location)}` : '';
-  const expLevel =
-    params.experienceLevel?.toLowerCase() === 'internship'
-      ? '&f_E=1'
-      : params.experienceLevel?.toLowerCase() === 'full-time'
-        ? '&f_E=3'
-        : '';
-  const jobType = params.jobType ? `&f_JT=${params.jobType.toUpperCase()}` : '';
+
+  // Properly handle experience level
+  // Only set it if the user specifically requested an experience level
+  let expLevel = '';
+  if (params.experienceLevel) {
+    if (params.experienceLevel.toLowerCase() === 'internship') {
+      expLevel = '&f_E=1';
+    } else if (params.experienceLevel.toLowerCase() === 'full-time') {
+      // For full-time positions, include associate through executive levels (2-6)
+      expLevel = '&f_E=2,3,4,5,6';
+    } else if (params.experienceLevel.toLowerCase() === 'entry level') {
+      expLevel = '&f_E=1';
+    } else if (params.experienceLevel.toLowerCase() === 'associate') {
+      expLevel = '&f_E=2';
+    } else if (params.experienceLevel.toLowerCase() === 'mid-senior level') {
+      expLevel = '&f_E=3';
+    } else if (params.experienceLevel.toLowerCase() === 'director') {
+      expLevel = '&f_E=4';
+    } else if (params.experienceLevel.toLowerCase() === 'executive') {
+      expLevel = '&f_E=5';
+    }
+  }
+
+  // Handle job type separately from experience level
+  const jobType =
+    params.jobType?.toLowerCase() === 'full-time'
+      ? '&f_JT=FULLTIME'
+      : params.jobType?.toLowerCase() === 'part-time'
+        ? '&f_JT=PARTTIME'
+        : params.jobType?.toLowerCase() === 'contract'
+          ? '&f_JT=CONTRACT'
+          : params.jobType?.toLowerCase() === 'internship'
+            ? '&f_JT=INTERNSHIP'
+            : params.jobType?.toLowerCase() === 'temporary'
+              ? '&f_JT=TEMPORARY'
+              : '';
+
   const datePosted =
     params.datePosted === 'past_24h'
       ? '&f_TPR=r86400'
@@ -280,6 +310,7 @@ async function handleDirectLinkedInSearch(params) {
         : params.datePosted === 'past_month'
           ? '&f_TPR=r2592000'
           : '';
+
   const remote = params.remoteOption ? '&f_WT=2' : '';
 
   // Construct the full URL
@@ -306,15 +337,15 @@ function createLinkedInSearchUrl(params: any): string {
       'mid-senior level': '3',
       director: '4',
       executive: '5',
-      // Map UI options to LinkedIn parameters
+      // Special case for full-time experience levels - now including level 2 (Associate)
+      'full-time': '2,3,4,5,6', // Include multiple experience levels
       internship: '1',
-      'full-time': '3', // Map full-time to mid-senior as a default
     };
     const level = expMap[params.experienceLevel.toLowerCase()];
     if (level) expLevel = `&f_E=${level}`;
   }
 
-  // Map job type to LinkedIn's format
+  // Map job type to LinkedIn's format - separate from experience level
   let jobType = '';
   if (params.jobType) {
     const jobMap: { [key: string]: string } = {
@@ -340,9 +371,8 @@ function createLinkedInSearchUrl(params: any): string {
     if (date) datePosted = `&f_TPR=${date}`;
   }
 
-  // Add remote filter if set
-  const remote = params.remoteOption ? '&f_WT=2' : '';
-
   // Construct the full URL
-  return `https://www.linkedin.com/jobs/search/?keywords=${keywords}${location}${expLevel}${jobType}${datePosted}${remote}`;
+  const linkedInUrl = `https://www.linkedin.com/jobs/search/?keywords=${keywords}${location}${expLevel}${jobType}${datePosted}`;
+
+  return linkedInUrl;
 }
