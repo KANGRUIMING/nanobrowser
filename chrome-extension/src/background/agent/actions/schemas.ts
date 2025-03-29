@@ -14,6 +14,14 @@ export const doneActionSchema: ActionSchema = {
   }),
 };
 
+export const searchLinkedInActionSchema: ActionSchema = {
+  name: 'search_linkedin',
+  description: 'Search LinkedIn in the current tab',
+  schema: z.object({
+    query: z.string(),
+  }),
+};
+
 // Basic Navigation Actions
 export const searchGoogleActionSchema: ActionSchema = {
   name: 'search_google',

@@ -512,8 +512,45 @@ const SidePanel = () => {
   };
 
   const handleApplyNow = () => {
-    // Implementation for apply now functionality
-    console.log('Apply Now clicked');
+    // Format job preferences into a message
+    let message = "I'm looking for";
+
+    // Add job title if provided
+    if (jobTitle) {
+      message += ` a ${jobTitle} position`;
+    } else {
+      message += ' a job';
+    }
+
+    // Add job types if selected
+    if (selectedJobTypes.length > 0) {
+      message += ` that is ${selectedJobTypes.join(' or ')}`;
+    }
+
+    // Add location if provided
+    if (jobLocation) {
+      message += ` in ${jobLocation}`;
+    }
+
+    // Add experience level if selected
+    if (selectedExperienceLevels.length > 0) {
+      message += `. My experience level is ${selectedExperienceLevels.join(' or ')}`;
+    }
+
+    // Add salary expectation if selected
+    if (selectedSalary) {
+      message += `. I'm looking for a salary of ${selectedSalary}`;
+    }
+
+    // Add resume text if provided
+    if (resumeText) {
+      message += '.\n\nHere is my resume:\n' + resumeText;
+    }
+
+    message += '.\n\nCan you help me find suitable job openings and possibly prepare application materials?';
+
+    // Send the message using the existing function
+    handleSendMessage(message);
   };
 
   // Create a custom handler for the resume input
