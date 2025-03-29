@@ -24,6 +24,10 @@ const SidePanel = () => {
   const [isHistoricalSession, setIsHistoricalSession] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [jobTitle, setJobTitle] = useState('');
+  const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
+  const [jobLocation, setJobLocation] = useState('');
+  const [selectedExperienceLevels, setSelectedExperienceLevels] = useState<string[]>([]);
+  const [selectedSalary, setSelectedSalary] = useState('');
   const sessionIdRef = useRef<string | null>(null);
   const portRef = useRef<chrome.runtime.Port | null>(null);
   const heartbeatIntervalRef = useRef<number | null>(null);
@@ -470,6 +474,30 @@ const SidePanel = () => {
     }
   };
 
+  const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Temporary', 'Volunteer', 'Internship', 'Other'];
+
+  const experienceLevels = ['Internship', 'Entry level', 'Associate', 'Mid-Senior level', 'Director', 'Executive'];
+
+  const salaryOptions = [
+    '$40,000+',
+    '$60,000+',
+    '$80,000+',
+    '$100,000+',
+    '$120,000+',
+    '$140,000+',
+    '$160,000+',
+    '$180,000+',
+    '$200,000+',
+  ];
+
+  const toggleJobType = (jobType: string) => {
+    setSelectedJobTypes(prev => (prev.includes(jobType) ? prev.filter(type => type !== jobType) : [...prev, jobType]));
+  };
+
+  const toggleExperienceLevel = (level: string) => {
+    setSelectedExperienceLevels(prev => (prev.includes(level) ? prev.filter(l => l !== level) : [...prev, level]));
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -587,6 +615,96 @@ const SidePanel = () => {
                         : 'bg-white border-sky-200 text-gray-800 placeholder-gray-500'
                     } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-sky-500' : 'focus:ring-sky-300'}`}
                   />
+                </div>
+                <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                  <label className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-2`}>
+                    Job Type
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {jobTypes.map(jobType => (
+                      <div key={jobType} className="flex items-center">
+                        <input
+                          id={`jobType-${jobType}`}
+                          type="checkbox"
+                          checked={selectedJobTypes.includes(jobType)}
+                          onChange={() => toggleJobType(jobType)}
+                          className={`h-4 w-4 rounded ${
+                            isDarkMode ? 'border-sky-700 bg-slate-700 text-sky-500' : 'border-sky-300 text-sky-600'
+                          } focus:ring-2 focus:ring-sky-400`}
+                        />
+                        <label htmlFor={`jobType-${jobType}`} className="ml-2 block text-sm">
+                          {jobType}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                  <label
+                    htmlFor="jobLocation"
+                    className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-1`}>
+                    Job Location
+                  </label>
+                  <input
+                    id="jobLocation"
+                    type="text"
+                    value={jobLocation}
+                    onChange={e => setJobLocation(e.target.value)}
+                    placeholder="Enter job location or 'Remote'"
+                    className={`w-full px-3 py-2 rounded-md border ${
+                      isDarkMode
+                        ? 'bg-slate-800 border-sky-800 text-white placeholder-gray-400'
+                        : 'bg-white border-sky-200 text-gray-800 placeholder-gray-500'
+                    } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-sky-500' : 'focus:ring-sky-300'}`}
+                  />
+                </div>
+                <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                  <label className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-2`}>
+                    Experience Level
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {experienceLevels.map(level => (
+                      <div key={level} className="flex items-center">
+                        <input
+                          id={`experienceLevel-${level}`}
+                          type="checkbox"
+                          checked={selectedExperienceLevels.includes(level)}
+                          onChange={() => toggleExperienceLevel(level)}
+                          className={`h-4 w-4 rounded ${
+                            isDarkMode ? 'border-sky-700 bg-slate-700 text-sky-500' : 'border-sky-300 text-sky-600'
+                          } focus:ring-2 focus:ring-sky-400`}
+                        />
+                        <label htmlFor={`experienceLevel-${level}`} className="ml-2 block text-sm">
+                          {level}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                  <label className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-2`}>
+                    Salary
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {salaryOptions.map(salary => (
+                      <div key={salary} className="flex items-center">
+                        <input
+                          id={`salary-${salary}`}
+                          type="radio"
+                          name="salary"
+                          value={salary}
+                          checked={selectedSalary === salary}
+                          onChange={() => setSelectedSalary(salary)}
+                          className={`h-4 w-4 ${
+                            isDarkMode ? 'border-sky-700 bg-slate-700 text-sky-500' : 'border-sky-300 text-sky-600'
+                          } focus:ring-2 focus:ring-sky-400`}
+                        />
+                        <label htmlFor={`salary-${salary}`} className="ml-2 block text-sm">
+                          {salary}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <TemplateList
