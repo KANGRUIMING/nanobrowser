@@ -23,6 +23,7 @@ const SidePanel = () => {
   const [isFollowUpMode, setIsFollowUpMode] = useState(false);
   const [isHistoricalSession, setIsHistoricalSession] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [jobTitle, setJobTitle] = useState('');
   const sessionIdRef = useRef<string | null>(null);
   const portRef = useRef<chrome.runtime.Port | null>(null);
   const heartbeatIntervalRef = useRef<number | null>(null);
@@ -566,6 +567,25 @@ const SidePanel = () => {
                       setInputTextRef.current = setter;
                     }}
                     isDarkMode={isDarkMode}
+                  />
+                </div>
+                <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                  <label
+                    htmlFor="jobTitle"
+                    className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-1`}>
+                    Job Title
+                  </label>
+                  <input
+                    id="jobTitle"
+                    type="text"
+                    value={jobTitle}
+                    onChange={e => setJobTitle(e.target.value)}
+                    placeholder="Enter your job title"
+                    className={`w-full px-3 py-2 rounded-md border ${
+                      isDarkMode
+                        ? 'bg-slate-800 border-sky-800 text-white placeholder-gray-400'
+                        : 'bg-white border-sky-200 text-gray-800 placeholder-gray-500'
+                    } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-sky-500' : 'focus:ring-sky-300'}`}
                   />
                 </div>
                 <div>
