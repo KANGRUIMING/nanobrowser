@@ -99,7 +99,7 @@ export default function ChatInput({
   return (
     <form
       onSubmit={handleSubmit}
-      className={`overflow-hidden rounded-lg border transition-colors focus-within:border-sky-400 hover:border-sky-400 ${isDarkMode ? 'border-slate-700' : ''}`}
+      className={`overflow-hidden rounded-lg border transition-colors focus-within:border-purple-400 hover:border-purple-400 ${isDarkMode ? 'border-slate-700' : ''}`}
       aria-label="Chat input form">
       <div className="flex flex-col">
         <textarea
@@ -141,7 +141,7 @@ export default function ChatInput({
               <button
                 type="submit"
                 disabled={disabled}
-                className={`rounded-md bg-[#19C2FF] px-3 py-1 text-white transition-colors hover:bg-[#0073DC] ${disabled ? 'opacity-50' : ''}`}>
+                className={`rounded-md bg-purple-500 px-3 py-1 text-white transition-colors hover:bg-purple-600 ${disabled ? 'opacity-50' : ''}`}>
                 {buttonText}
               </button>
             )}

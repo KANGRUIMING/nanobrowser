@@ -855,7 +855,7 @@ ${resumeText}
                       <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
                         <label
                           htmlFor="role"
-                          className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-1`}>
+                          className={`block text-sm font-medium ${isDarkMode ? 'text-purple-400' : 'text-purple-600'} mb-1`}>
                           Role
                         </label>
                         <input
@@ -867,9 +867,9 @@ ${resumeText}
                           maxLength={30}
                           className={`w-full px-3 py-2 rounded-md border ${
                             isDarkMode
-                              ? 'bg-slate-800 border-sky-800 text-white placeholder-gray-400'
-                              : 'bg-white border-sky-200 text-gray-800 placeholder-gray-500'
-                          } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-sky-500' : 'focus:ring-sky-300'}`}
+                              ? 'bg-slate-800 border-purple-800 text-white placeholder-gray-400'
+                              : 'bg-white border-purple-200 text-gray-800 placeholder-gray-500'
+                          } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-purple-300'}`}
                         />
                         <div
                           className={`text-xs mt-1 text-right ${
@@ -882,7 +882,7 @@ ${resumeText}
                       {/* Position Type - restricted to just Internship and Full-time */}
                       <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
                         <label
-                          className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-2`}>
+                          className={`block text-sm font-medium ${isDarkMode ? 'text-purple-400' : 'text-purple-600'} mb-2`}>
                           Position Type
                         </label>
                         <div className="flex gap-4">
@@ -897,9 +897,9 @@ ${resumeText}
                                 onChange={() => setPositionType(type)}
                                 className={`h-4 w-4 ${
                                   isDarkMode
-                                    ? 'border-sky-700 bg-slate-700 text-sky-500'
-                                    : 'border-sky-300 text-sky-600'
-                                } focus:ring-2 focus:ring-sky-400`}
+                                    ? 'border-purple-700 bg-slate-700 text-purple-500'
+                                    : 'border-purple-300 text-purple-600'
+                                } focus:ring-2 focus:ring-purple-400`}
                               />
                               <label htmlFor={`positionType-${type}`} className="ml-2 block text-sm">
                                 {type}
@@ -912,7 +912,7 @@ ${resumeText}
                       {/* Date Posted */}
                       <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
                         <label
-                          className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-2`}>
+                          className={`block text-sm font-medium ${isDarkMode ? 'text-purple-400' : 'text-purple-600'} mb-2`}>
                           Date Posted
                         </label>
                         <div className="grid grid-cols-2 gap-2">
@@ -927,9 +927,9 @@ ${resumeText}
                                 onChange={() => setSelectedDatePosted(option.value)}
                                 className={`h-4 w-4 ${
                                   isDarkMode
-                                    ? 'border-sky-700 bg-slate-700 text-sky-500'
-                                    : 'border-sky-300 text-sky-600'
-                                } focus:ring-2 focus:ring-sky-400`}
+                                    ? 'border-purple-700 bg-slate-700 text-purple-500'
+                                    : 'border-purple-300 text-purple-600'
+                                } focus:ring-2 focus:ring-purple-400`}
                               />
                               <label htmlFor={`datePosted-${option.value}`} className="ml-2 block text-sm">
                                 {option.label}
@@ -943,7 +943,7 @@ ${resumeText}
                       <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
                         <label
                           htmlFor="preferredLocation"
-                          className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-1`}>
+                          className={`block text-sm font-medium ${isDarkMode ? 'text-purple-400' : 'text-purple-600'} mb-1`}>
                           Preferred Location
                         </label>
                         <input
@@ -954,9 +954,9 @@ ${resumeText}
                           placeholder="e.g., New York, Remote, San Francisco"
                           className={`w-full px-3 py-2 rounded-md border ${
                             isDarkMode
-                              ? 'bg-slate-800 border-sky-800 text-white placeholder-gray-400'
-                              : 'bg-white border-sky-200 text-gray-800 placeholder-gray-500'
-                          } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-sky-500' : 'focus:ring-sky-300'}`}
+                              ? 'bg-slate-800 border-purple-800 text-white placeholder-gray-400'
+                              : 'bg-white border-purple-200 text-gray-800 placeholder-gray-500'
+                          } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-purple-300'}`}
                         />
                       </div>
 
@@ -969,12 +969,14 @@ ${resumeText}
                             checked={isRemote}
                             onChange={e => setIsRemote(e.target.checked)}
                             className={`h-4 w-4 rounded ${
-                              isDarkMode ? 'border-sky-700 bg-slate-700 text-sky-500' : 'border-sky-300 text-sky-600'
-                            } focus:ring-2 focus:ring-sky-400`}
+                              isDarkMode
+                                ? 'border-purple-700 bg-slate-700 text-purple-500'
+                                : 'border-purple-300 text-purple-600'
+                            } focus:ring-2 focus:ring-purple-400`}
                           />
                           <label
                             htmlFor="isRemote"
-                            className={`ml-2 block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'}`}>
+                            className={`ml-2 block text-sm font-medium ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>
                             Remote?
                           </label>
                         </div>
@@ -1020,8 +1022,8 @@ ${resumeText}
                           }}
                           className={`py-2 px-4 rounded ${
                             isDarkMode
-                              ? 'bg-sky-600 hover:bg-sky-500 text-white'
-                              : 'bg-sky-500 hover:bg-sky-400 text-white'
+                              ? 'bg-purple-600 hover:bg-purple-500 text-white'
+                              : 'bg-purple-500 hover:bg-purple-400 text-white'
                           }`}>
                           Save Preferences
                         </button>
@@ -1049,8 +1051,8 @@ ${resumeText}
                         rel="noopener noreferrer"
                         className={`py-2 px-4 rounded ${
                           isDarkMode
-                            ? 'bg-sky-600 hover:bg-sky-500 text-white'
-                            : 'bg-sky-500 hover:bg-sky-400 text-white'
+                            ? 'bg-purple-600 hover:bg-purple-500 text-white'
+                            : 'bg-purple-500 hover:bg-purple-400 text-white'
                         }`}>
                         Go to LinkedIn
                       </a>
@@ -1063,7 +1065,7 @@ ${resumeText}
                   )}
                 </div>
                 <div
-                  className={`border-t ${isDarkMode ? 'border-sky-900' : 'border-sky-100'} p-2 shadow-sm backdrop-blur-sm`}>
+                  className={`border-t ${isDarkMode ? 'border-purple-900' : 'border-purple-100'} p-2 shadow-sm backdrop-blur-sm`}>
                   <ChatInput
                     onSendMessage={handleSendMessage}
                     onStopTask={handleStopTask}
