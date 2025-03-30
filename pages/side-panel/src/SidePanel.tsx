@@ -573,7 +573,8 @@ const SidePanel = () => {
       if (resumeText) {
         const jobApplyPrompt = `Apply to one of the jobs that are displayed on this page. 
         
-Attached in the prompt is my resume, when filling out the application, refer to it for the information. Use the resume to fill in personal, educational, and experience details in each application. If you can't proceed in the application, check if all fields have been filled in. 
+Attached in the prompt is my resume, when filling out the application, refer to it for the information. 
+Use the resume to fill in personal, educational, and experience details in each application. If LinkedinIf you can't proceed in the application, check if all fields have been filled in. 
 
 ${resumeText}
 `;
@@ -684,44 +685,6 @@ ${resumeText}
 
     // Construct the full URL
     return `https://www.linkedin.com/jobs/search/?keywords=${keywords}${location}${expLevel}${jobType}${datePosted}${remote}${easyApply}`;
-  };
-
-  const handleAutoApply = async () => {
-    try {
-      // Get active tab
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      const tab = tabs[0];
-
-      // Verify we're on a LinkedIn search results page
-      if (!tab.url?.includes('linkedin.com/jobs/search')) {
-        appendMessage({
-          actor: Actors.SYSTEM,
-          content: 'Please navigate to a LinkedIn job search results page before using Auto Apply.',
-          timestamp: Date.now(),
-        });
-        return;
-      }
-
-      // Start the auto-apply process with the agent
-      appendMessage({
-        actor: Actors.SYSTEM,
-        content: `Starting Auto Apply process. The assistant will automatically apply to Easy Apply jobs on this page using your resume and preferences. All applications will happen in the current tab.`,
-        timestamp: Date.now(),
-      });
-
-      // Send a user message to the agent with explicit instruction to stay in the current tab
-      handleSendMessage(
-        `Please apply to all Easy Apply jobs on this page that match my qualifications. Use my uploaded resume. Skip any jobs that require assessment tests or have more than 3 application steps. IMPORTANT: Do NOT open any new tabs or navigate away from this page - all actions must happen in the current tab.`,
-      );
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error('Auto Apply error', errorMessage);
-      appendMessage({
-        actor: Actors.SYSTEM,
-        content: errorMessage,
-        timestamp: Date.now(),
-      });
-    }
   };
 
   return (
@@ -836,13 +799,6 @@ ${resumeText}
                           !isApplyEnabled() ? 'opacity-50 cursor-not-allowed' : ''
                         }`}>
                         Apply Now
-                      </button>
-
-                      <button
-                        onClick={handleAutoApply}
-                        disabled={isDisabled}
-                        className="py-2 px-4 rounded bg-green-600 hover:bg-green-500 text-white">
-                        Auto Apply
                       </button>
                     </div>
                   </div>
