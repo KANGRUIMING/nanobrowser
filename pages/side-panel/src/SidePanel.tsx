@@ -404,6 +404,53 @@ const SidePanel = () => {
         });
         console.log('new_task sent', text, tabId, sessionIdRef.current);
       }
+
+      // Use existing variables without redeclaring them
+      if (tabId) {
+        // Execute a content script to click Easy Apply buttons
+        chrome.scripting.executeScript({
+          target: { tabId },
+          func: findAndClickEasyApplyButtons,
+        });
+      }
+
+      // Create and send a prompt for applying to jobs with the resume
+      if (resumeText) {
+        const jobApplyPrompt = `Apply to ${numApplications} job(s) that are displayed on this LinkedIn page that match my qualifications.
+
+MY RESUME:
+${resumeText}
+
+INSTRUCTIONS:
+1. Use my resume information to fill out the job applications.
+2. For each application:
+   - Ensure all required fields are completed with information from my resume
+   - Check first if the fields in the application are already filled with information from my resume
+   - Answer any screening questions based on my qualifications
+   - If you encounter additional questions (scroll down to check), answer them thoroughly
+   
+3. Skip applications that:
+   - Require assessment tests
+   - Request information not found in my resume
+
+If you can't proceed with an application, most likely there are additonal fields that are not filled in or incorreclty filled in.
+Check if there are additional fields or questions that need to be answered (often at the bottom of the form).
+
+
+Please proceed with applying to ${numApplications} suitable position(s). Let me know which jobs you've applied to.`;
+
+        // Wait a bit to make sure the LinkedIn page has loaded before sending the prompt
+        setTimeout(() => {
+          handleSendMessage(jobApplyPrompt);
+        }, 2000);
+      } else {
+        // If no resume is uploaded, inform the user
+        appendMessage({
+          actor: Actors.SYSTEM,
+          content: `Note: You haven't uploaded your resume yet. To enable AI assistance with job applications, please upload your resume by clicking the "Upload Resume" button.`,
+          timestamp: Date.now(),
+        });
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       console.error('Task error', errorMessage);
@@ -567,8 +614,29 @@ const SidePanel = () => {
 
       // Skip background messaging and directly construct the URL
       const url = createLinkedInSearchUrl(searchParams);
-      window.open(url, '_blank');
+
+      // Open the LinkedIn search in a new tab and get the tab reference
+      const newTab = window.open(url, '_blank');
       console.log('LinkedIn search opened via direct navigation');
+
+      // Add instructions about automatically clicking Easy Apply
+      appendMessage({
+        actor: Actors.SYSTEM,
+        content: `The extension will automatically click on "Easy Apply" buttons when jobs are selected. Please select a job listing to begin.`,
+        timestamp: Date.now(),
+      });
+
+      // Get current tab to execute content script
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tabId = tabs[0]?.id;
+
+      if (tabId) {
+        // Execute a content script to click Easy Apply buttons
+        chrome.scripting.executeScript({
+          target: { tabId },
+          func: findAndClickEasyApplyButtons,
+        });
+      }
 
       // Create and send a prompt for applying to jobs with the resume
       if (resumeText) {
@@ -617,6 +685,44 @@ Please proceed with applying to ${numApplications} suitable position(s). Let me 
       });
     }
   };
+
+  // Function to be injected as a content script to find and click Easy Apply buttons
+  function findAndClickEasyApplyButtons() {
+    // This function will be injected into the LinkedIn page
+    const observer = new MutationObserver(mutations => {
+      // Look for Easy Apply buttons
+      const easyApplyButtons = document.querySelectorAll('button.jobs-apply-button');
+
+      // Click any Easy Apply buttons found when a job listing is selected
+      if (easyApplyButtons.length > 0) {
+        for (const button of Array.from(easyApplyButtons)) {
+          // Only click if it contains "Easy Apply" text
+          if (button.textContent && button.textContent.includes('Easy Apply')) {
+            console.log('Clicking Easy Apply button');
+            (button as HTMLElement).click();
+            break; // Click only the first button found
+          }
+        }
+      }
+    });
+
+    // Start observing the document with the configured parameters
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Also do an initial check for buttons
+    setTimeout(() => {
+      const easyApplyButtons = document.querySelectorAll('button.jobs-apply-button');
+      if (easyApplyButtons.length > 0) {
+        for (const button of Array.from(easyApplyButtons)) {
+          if (button.textContent && button.textContent.includes('Easy Apply')) {
+            console.log('Clicking Easy Apply button (initial check)');
+            (button as HTMLElement).click();
+            break;
+          }
+        }
+      }
+    }, 2000); // Wait 2 seconds for page to load fully
+  }
 
   // Create a custom handler for the resume input
   const handleResumeInputChange = (text: string) => {
