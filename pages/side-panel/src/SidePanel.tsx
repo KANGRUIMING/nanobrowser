@@ -574,7 +574,9 @@ const SidePanel = () => {
         const jobApplyPrompt = `Apply to one of the jobs that are displayed on this page. 
         
 Attached in the prompt is my resume, when filling out the application, refer to it for the information. 
-Use the resume to fill in personal, educational, and experience details in each application. If LinkedinIf you can't proceed in the application, check if all fields have been filled in. 
+Use the resume to fill in personal, educational, and experience details in each application. Make sure when LinkedIn asks for you to select a resume, you're not unselecting a resume that's already attached.
+If LinkedinIf you can't proceed in the application, check if all fields have been filled in. 
+If you further can't proceed, scroll down on the Linkedin popup page to see if there are additonal questions to answer.
 
 ${resumeText}
 `;
