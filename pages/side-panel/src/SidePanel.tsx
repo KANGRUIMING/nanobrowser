@@ -805,9 +805,17 @@ ${resumeText}
                     </div>
                   </div>
                 ) : showUploadResume ? (
-                  <div className="flex-1 flex flex-col">
-                    <div
-                      className={`border-t ${isDarkMode ? 'border-sky-900' : 'border-sky-100'} p-2 shadow-sm backdrop-blur-sm`}>
+                  <div className="flex-1 flex flex-col p-4">
+                    <div className="text-center mb-4">
+                      <p className={`text-lg font-medium ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                        Upload your resume or paste its content
+                      </p>
+                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Type or paste your resume content in the box below
+                      </p>
+                    </div>
+
+                    <div className="flex-1">
                       <ChatInput
                         onSendMessage={handleSendMessage}
                         onStopTask={handleStopTask}
@@ -819,30 +827,22 @@ ${resumeText}
                         }}
                         onChange={handleResumeInputChange}
                         isDarkMode={isDarkMode}
+                        hideSendButton={true}
+                        rows={15}
+                        placeholder="Paste your resume here..."
                       />
                     </div>
-                    <div className="flex-1 overflow-y-auto p-4">
-                      <div className="text-center mb-4">
-                        <p className={`text-lg font-medium ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                          Upload your resume or paste its content
-                        </p>
-                        <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          Type or paste your resume content in the chat box above
-                        </p>
-                      </div>
-                      <div className="flex justify-center">
-                        <button
-                          onClick={() => {
-                            setShowUploadResume(false);
-                          }}
-                          className={`py-2 px-4 rounded ${
-                            isDarkMode
-                              ? 'bg-slate-700 hover:bg-slate-600 text-white'
-                              : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                          }`}>
-                          Back
-                        </button>
-                      </div>
+
+                    <div className="mt-4 flex justify-center">
+                      <button
+                        onClick={() => {
+                          setShowUploadResume(false);
+                        }}
+                        className={`py-2 px-8 rounded-lg text-white font-medium ${
+                          isDarkMode ? 'bg-purple-600 hover:bg-purple-500' : 'bg-purple-500 hover:bg-purple-600'
+                        }`}>
+                        Done
+                      </button>
                     </div>
                   </div>
                 ) : (

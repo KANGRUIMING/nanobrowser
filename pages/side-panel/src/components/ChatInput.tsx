@@ -9,6 +9,10 @@ interface ChatInputProps {
   isDarkMode?: boolean;
   initialContent?: string;
   onChange?: (text: string) => void;
+  buttonText?: string;
+  placeholder?: string;
+  hideSendButton?: boolean;
+  rows?: number;
 }
 
 export default function ChatInput({
@@ -20,6 +24,10 @@ export default function ChatInput({
   isDarkMode = false,
   initialContent,
   onChange,
+  buttonText = 'Send',
+  placeholder = 'Type a message...',
+  hideSendButton = false,
+  rows = 5,
 }: ChatInputProps) {
   const [text, setText] = useState(initialContent || '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -33,7 +41,7 @@ export default function ChatInput({
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = 'auto';
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 100)}px`;
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 400)}px`;
     }
   };
 
@@ -49,7 +57,7 @@ export default function ChatInput({
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = 'auto';
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 100)}px`;
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 400)}px`;
     }
   }, []);
 
@@ -100,7 +108,8 @@ export default function ChatInput({
           onChange={handleTextChange}
           onKeyDown={handleKeyDown}
           disabled={disabled}
-          rows={5}
+          rows={rows}
+          style={{ minHeight: hideSendButton ? '400px' : 'auto' }}
           className={`w-full resize-none border-none p-2 focus:outline-none ${
             disabled
               ? isDarkMode
@@ -110,32 +119,34 @@ export default function ChatInput({
                 ? 'bg-slate-800 text-gray-200'
                 : 'bg-white'
           }`}
-          placeholder="Paste Resume here?"
+          placeholder={placeholder}
           aria-label="Message input"
         />
 
-        <div
-          className={`flex items-center justify-between px-2 py-1.5 ${
-            disabled ? (isDarkMode ? 'bg-slate-800' : 'bg-gray-100') : isDarkMode ? 'bg-slate-800' : 'bg-white'
-          }`}>
-          <div className="flex gap-2 text-gray-500">{/* Icons can go here */}</div>
+        {!hideSendButton && (
+          <div
+            className={`flex items-center justify-between px-2 py-1.5 ${
+              disabled ? (isDarkMode ? 'bg-slate-800' : 'bg-gray-100') : isDarkMode ? 'bg-slate-800' : 'bg-white'
+            }`}>
+            <div className="flex gap-2 text-gray-500">{/* Icons can go here */}</div>
 
-          {showStopButton ? (
-            <button
-              type="button"
-              onClick={onStopTask}
-              className="rounded-md bg-red-500 px-3 py-1 text-white transition-colors hover:bg-red-600">
-              Stop
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={disabled}
-              className={`rounded-md bg-[#19C2FF] px-3 py-1 text-white transition-colors hover:bg-[#0073DC] ${disabled ? 'opacity-50' : ''}`}>
-              Send
-            </button>
-          )}
-        </div>
+            {showStopButton ? (
+              <button
+                type="button"
+                onClick={onStopTask}
+                className="rounded-md bg-red-500 px-3 py-1 text-white transition-colors hover:bg-red-600">
+                Stop
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={disabled}
+                className={`rounded-md bg-[#19C2FF] px-3 py-1 text-white transition-colors hover:bg-[#0073DC] ${disabled ? 'opacity-50' : ''}`}>
+                {buttonText}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </form>
   );
