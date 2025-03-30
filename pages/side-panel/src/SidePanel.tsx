@@ -572,17 +572,26 @@ const SidePanel = () => {
 
       // Create and send a prompt for applying to jobs with the resume
       if (resumeText) {
-        const jobApplyPrompt = `Apply to one of the jobs that are displayed on this page. 
-        
-Attached in the prompt is my resume, when filling out the application, refer to it for the information. 
-Use the resume to fill in personal, educational, and experience details in each application. Make sure when LinkedIn asks for you to select a resume, you're not unselecting a resume that's already attached.
-If LinkedinIf you can't proceed in the application, check if all fields have been filled in. 
-If you further can't proceed, scroll down on the Linkedin popup page to see if there are additonal questions to answer.
+        const jobApplyPrompt = `Apply to ${numApplications} job(s) that are displayed on this LinkedIn page that match my qualifications.
 
-Number of applications to submit: ${numApplications}
-
+MY RESUME:
 ${resumeText}
-`;
+
+INSTRUCTIONS:
+1. Use my resume information to fill out the job applications.
+2. For each application:
+   - Ensure all required fields are completed with information from my resume
+   - Check first if the fields in the application are already filled with information from my resume
+   - Answer any screening questions based on my qualifications
+   - If you encounter additional questions (scroll down to check), answer them thoroughly
+   
+3. Skip applications that:
+   - Require assessment tests
+   - Request information not found in my resume
+
+If you can't proceed with an application, check if there are additional fields or questions that need to be answered (often at the bottom of the form).
+
+Please proceed with applying to ${numApplications} suitable position(s). Let me know which jobs you've applied to.`;
 
         // Wait a bit to make sure the LinkedIn page has loaded before sending the prompt
         setTimeout(() => {
@@ -986,7 +995,7 @@ ${resumeText}
                       <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
                         <label
                           htmlFor="numApplications"
-                          className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-1`}>
+                          className={`block text-sm font-medium ${isDarkMode ? 'text-purple-400' : 'text-purple-600'} mb-1`}>
                           Number of Applications
                         </label>
                         <input
@@ -998,9 +1007,9 @@ ${resumeText}
                           onChange={e => setNumApplications(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
                           className={`w-full px-3 py-2 rounded-md border ${
                             isDarkMode
-                              ? 'bg-slate-800 border-sky-800 text-white'
-                              : 'bg-white border-sky-200 text-gray-800'
-                          } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-sky-500' : 'focus:ring-sky-300'}`}
+                              ? 'bg-slate-800 border-purple-800 text-white'
+                              : 'bg-white border-purple-200 text-gray-800'
+                          } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-purple-300'}`}
                         />
                         <div className="text-xs mt-1 text-gray-500">Specify how many applications to submit (1-10)</div>
                       </div>
