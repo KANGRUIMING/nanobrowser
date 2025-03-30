@@ -527,16 +527,19 @@ const SidePanel = () => {
   };
 
   const getDatePostedText = (value: string): string => {
-    switch (value) {
-      case 'past_month':
-        return 'posted in the Past Month';
-      case 'past_week':
-        return 'posted in the Past Week';
-      case 'past_24h':
-        return 'posted in the Past 24 Hours';
-      default:
-        return '';
-    }
+    const dateMap: { [key: string]: string } = {
+      past_24h: 'Past 24 hours',
+      past_week: 'Past week',
+      past_month: 'Past month',
+      any: 'Any time',
+    };
+    return dateMap[value] || 'Any time';
+  };
+
+  // Function to check if Apply Now button should be enabled
+  const isApplyEnabled = (): boolean => {
+    // Require at least a resume and role to be set
+    return Boolean(resumeText) && Boolean(role.trim());
   };
 
   const handleApplyNow = async () => {
@@ -565,6 +568,28 @@ const SidePanel = () => {
       const url = createLinkedInSearchUrl(searchParams);
       window.open(url, '_blank');
       console.log('LinkedIn search opened via direct navigation');
+
+      // Create and send a prompt for applying to jobs with the resume
+      if (resumeText) {
+        const jobApplyPrompt = `Apply to one of the jobs that are displayed on this page. 
+        
+Attached in the prompt is my resume, when filling out the application, refer to it for the information. Use the resume to fill in personal, educational, and experience details in each application. If you can't proceed in the application, check if all fields have been filled in. 
+
+${resumeText}
+`;
+
+        // Wait a bit to make sure the LinkedIn page has loaded before sending the prompt
+        setTimeout(() => {
+          handleSendMessage(jobApplyPrompt);
+        }, 2000);
+      } else {
+        // If no resume is uploaded, inform the user
+        appendMessage({
+          actor: Actors.SYSTEM,
+          content: `Note: You haven't uploaded your resume yet. To enable AI assistance with job applications, please upload your resume by clicking the "Upload Resume" button.`,
+          timestamp: Date.now(),
+        });
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       console.error('Navigation error', errorMessage);
@@ -781,16 +806,16 @@ const SidePanel = () => {
                     <div className="w-full max-w-sm space-y-4">
                       <button
                         onClick={handleSetJobPreferences}
-                        className={`w-full py-3 px-4 rounded-full font-medium bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 transition-colors duration-200`}>
+                        className={`w-full py-3 px-4 rounded-full font-medium bg-white hover:bg-gray-50 text-gray-800 border border-purple-200 transition-colors duration-200`}>
                         Set Job Preferences
                       </button>
 
                       <button
                         onClick={handleUploadResume}
-                        className={`w-full py-3 px-4 rounded-full font-medium flex items-center justify-center bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 transition-colors duration-200`}>
+                        className={`w-full py-3 px-4 rounded-full font-medium flex items-center justify-center bg-white hover:bg-gray-50 text-gray-800 border border-purple-200 transition-colors duration-200`}>
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5 mr-2"
+                          className="h-5 w-5 mr-2 text-purple-500"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor">
@@ -806,7 +831,10 @@ const SidePanel = () => {
 
                       <button
                         onClick={handleApplyNow}
-                        className={`w-full py-3 px-4 rounded-full font-medium bg-purple-500 hover:bg-purple-600 text-white transition-colors duration-200`}>
+                        disabled={!isApplyEnabled()}
+                        className={`w-full py-3 px-4 rounded-full font-medium bg-purple-500 hover:bg-purple-600 text-white transition-colors duration-200 ${
+                          !isApplyEnabled() ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}>
                         Apply Now
                       </button>
 
