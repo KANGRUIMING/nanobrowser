@@ -767,7 +767,7 @@ Please proceed with applying to ${numApplications} suitable position(s). Let me 
         executive: '5',
         // Map UI options to LinkedIn parameters
         internship: '1',
-        'full-time': '3', // Map full-time to mid-senior as a default
+        'full-time': '2,3,4,5,6', // Map full-time to all professional experience levels
       };
       const level = expMap[params.experienceLevel.toLowerCase()];
       if (level) expLevel = `&f_E=${level}`;
