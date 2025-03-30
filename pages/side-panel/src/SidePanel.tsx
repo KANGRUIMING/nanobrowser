@@ -589,7 +589,9 @@ INSTRUCTIONS:
    - Require assessment tests
    - Request information not found in my resume
 
-If you can't proceed with an application, check if there are additional fields or questions that need to be answered (often at the bottom of the form).
+If you can't proceed with an application, most likely there are additonal fields that are not filled in or incorreclty filled in.
+Check if there are additional fields or questions that need to be answered (often at the bottom of the form).
+
 
 Please proceed with applying to ${numApplications} suitable position(s). Let me know which jobs you've applied to.`;
 
@@ -726,6 +728,7 @@ Please proceed with applying to ${numApplications} suitable position(s). Let me 
           <div className="header-icons">
             {!showHistory && (
               <>
+                {/* 
                 <button
                   type="button"
                   onClick={handleNewChat}
@@ -744,8 +747,10 @@ Please proceed with applying to ${numApplications} suitable position(s). Let me 
                   tabIndex={0}>
                   <GrHistory size={20} />
                 </button>
+                */}
               </>
             )}
+            {/* 
             <a
               href="https://discord.gg/NN3ABHggMK"
               target="_blank"
@@ -753,6 +758,7 @@ Please proceed with applying to ${numApplications} suitable position(s). Let me 
               className={`header-icon text-gray-700 hover:text-gray-900`}>
               <RxDiscordLogo size={20} />
             </a>
+            */}
             <button
               type="button"
               onClick={() => chrome.runtime.openOptionsPage()}
