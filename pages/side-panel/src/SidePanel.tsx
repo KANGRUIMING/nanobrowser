@@ -13,6 +13,13 @@ import { EventType, type AgentEvent, ExecutionState } from './types/event';
 import { defaultTemplates } from './templates';
 import './SidePanel.css';
 
+// Add this global declaration at the top level of the file
+declare global {
+  interface Window {
+    _easyApplyObserver: MutationObserver | null;
+  }
+}
+
 const SidePanel = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputEnabled, setInputEnabled] = useState(true);
@@ -42,6 +49,9 @@ const SidePanel = () => {
   const setInputTextRef = useRef<((text: string) => void) | null>(null);
   const [isDisabled, setIsDisabled] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Add this ref at the top of your component
+  const lastMessageTime = useRef<number>(0);
 
   // Check for dark mode preference - we're now forcing light mode
   useEffect(() => {
@@ -104,8 +114,58 @@ const SidePanel = () => {
     }
   }, []);
 
+  // Add a rate-limited version of appendMessage
+  const rateLimit = (fn: (...args: any[]) => void, delay: number) => {
+    let lastCall = 0;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let queuedArgs: any[] | null = null;
+
+    return (...args: any[]) => {
+      const now = Date.now();
+
+      if (now - lastCall < delay) {
+        // Queue this call to execute after delay
+        if (timeoutId) clearTimeout(timeoutId);
+        queuedArgs = args;
+
+        timeoutId = setTimeout(
+          () => {
+            if (queuedArgs) {
+              lastCall = Date.now();
+              fn(...queuedArgs);
+              queuedArgs = null;
+            }
+          },
+          delay - (now - lastCall),
+        );
+      } else {
+        // Execute immediately
+        lastCall = now;
+        fn(...args);
+      }
+    };
+  };
+
+  // Create a rate-limited appendMessage function
+  const throttledAppendMessage = useCallback(
+    rateLimit((message: Message, sessionId?: string | null) => {
+      appendMessage(message, sessionId);
+    }, 1000), // Limit to one message per second
+    [appendMessage],
+  );
+
   const handleTaskState = useCallback(
     (event: AgentEvent) => {
+      // Add a rate limiter - process at most one message every 1 second
+      const now = Date.now();
+      if (now - lastMessageTime.current < 1000) {
+        // Queue this message to be processed after delay
+        setTimeout(() => handleTaskState(event), 1000 - (now - lastMessageTime.current));
+        return;
+      }
+
+      lastMessageTime.current = now;
+
       const { actor, state, timestamp, data } = event;
       const content = data?.details;
       let skip = true;
@@ -404,53 +464,6 @@ const SidePanel = () => {
         });
         console.log('new_task sent', text, tabId, sessionIdRef.current);
       }
-
-      // Use existing variables without redeclaring them
-      if (tabId) {
-        // Execute a content script to click Easy Apply buttons
-        chrome.scripting.executeScript({
-          target: { tabId },
-          func: findAndClickEasyApplyButtons,
-        });
-      }
-
-      // Create and send a prompt for applying to jobs with the resume
-      if (resumeText) {
-        const jobApplyPrompt = `Apply to ${numApplications} job(s) that are displayed on this LinkedIn page that match my qualifications.
-
-MY RESUME:
-${resumeText}
-
-INSTRUCTIONS:
-1. Use my resume information to fill out the job applications.
-2. For each application:
-   - Ensure all required fields are completed with information from my resume
-   - Check first if the fields in the application are already filled with information from my resume
-   - Answer any screening questions based on my qualifications
-   - If you encounter additional questions (scroll down to check), answer them thoroughly
-   
-3. Skip applications that:
-   - Require assessment tests
-   - Request information not found in my resume
-
-If you can't proceed with an application, most likely there are additonal fields that are not filled in or incorreclty filled in.
-Check if there are additional fields or questions that need to be answered (often at the bottom of the form).
-
-
-Please proceed with applying to ${numApplications} suitable position(s). Let me know which jobs you've applied to.`;
-
-        // Wait a bit to make sure the LinkedIn page has loaded before sending the prompt
-        setTimeout(() => {
-          handleSendMessage(jobApplyPrompt);
-        }, 2000);
-      } else {
-        // If no resume is uploaded, inform the user
-        appendMessage({
-          actor: Actors.SYSTEM,
-          content: `Note: You haven't uploaded your resume yet. To enable AI assistance with job applications, please upload your resume by clicking the "Upload Resume" button.`,
-          timestamp: Date.now(),
-        });
-      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       console.error('Task error', errorMessage);
@@ -592,6 +605,14 @@ Please proceed with applying to ${numApplications} suitable position(s). Let me 
 
   const handleApplyNow = async () => {
     try {
+      console.log('Starting job application process...');
+
+      // Reset state to ensure clean start
+      if (showStopButton) {
+        console.log('Stopping any ongoing tasks before starting new job application');
+        handleStopTask();
+      }
+
       // Ensure role doesn't exceed 30 characters
       const trimmedRole = role.trim().substring(0, 30);
 
@@ -605,45 +626,125 @@ Please proceed with applying to ${numApplications} suitable position(s). Let me 
         easyApplyOnly: true,
       };
 
+      console.log('Search parameters:', JSON.stringify(searchParams));
+
+      // Create a new chat session specifically for this job application task
+      if (!isFollowUpMode) {
+        try {
+          const sessionTitle = `Job Search: ${searchParams.query}${searchParams.location ? ' in ' + searchParams.location : ''}`;
+          const newSession = await chatHistoryStore.createSession(sessionTitle);
+          console.log('Created new session for job application:', newSession);
+
+          setCurrentSessionId(newSession.id);
+          sessionIdRef.current = newSession.id;
+        } catch (err) {
+          console.error('Failed to create session for job application:', err);
+          // Continue without session if creation fails
+        }
+      }
+
       // Add a message to show that the search is being initiated
-      appendMessage({
-        actor: Actors.SYSTEM,
-        content: `Opening LinkedIn job search in a new tab for: ${searchParams.query} ${searchParams.location ? 'in ' + searchParams.location : ''} ${searchParams.datePosted ? '(' + getDatePostedText(selectedDatePosted) + ')' : ''} ${searchParams.remoteOption ? '(Remote)' : ''}`,
-        timestamp: Date.now(),
-      });
+      appendMessage(
+        {
+          actor: Actors.SYSTEM,
+          content: `Opening LinkedIn job search in a new tab for: ${searchParams.query} ${searchParams.location ? 'in ' + searchParams.location : ''} ${searchParams.datePosted ? '(' + getDatePostedText(selectedDatePosted) + ')' : ''} ${searchParams.remoteOption ? '(Remote)' : ''}`,
+          timestamp: Date.now(),
+        },
+        sessionIdRef.current,
+      );
 
       // Skip background messaging and directly construct the URL
       const url = createLinkedInSearchUrl(searchParams);
+      console.log('Generated LinkedIn search URL:', url);
 
       // Open the LinkedIn search in a new tab and get the tab reference
       const newTab = window.open(url, '_blank');
       console.log('LinkedIn search opened via direct navigation');
 
-      // Add instructions about automatically clicking Easy Apply
-      appendMessage({
-        actor: Actors.SYSTEM,
-        content: `The extension will automatically click on "Easy Apply" buttons when jobs are selected. Please select a job listing to begin.`,
-        timestamp: Date.now(),
-      });
+      // Wait a bit before executing the content script to ensure the page loads
+      setTimeout(async () => {
+        try {
+          console.log('Getting active tab to inject Easy Apply button observer...');
+          // Get current tab to execute content script
+          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+          const tabId = tabs[0]?.id;
 
-      // Get current tab to execute content script
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      const tabId = tabs[0]?.id;
+          if (tabId) {
+            console.log('Executing content script on tab ID:', tabId);
+            // Execute a content script to click Easy Apply buttons
+            chrome.scripting
+              .executeScript({
+                target: { tabId },
+                func: findAndClickEasyApplyButtons,
+              })
+              .then(() => {
+                console.log('Easy Apply button observer script injected successfully');
 
-      if (tabId) {
-        // Execute a content script to click Easy Apply buttons
-        chrome.scripting.executeScript({
-          target: { tabId },
-          func: findAndClickEasyApplyButtons,
-        });
-      }
+                // Add instructions about automatically clicking Easy Apply
+                appendMessage({
+                  actor: Actors.SYSTEM,
+                  content: `The extension will automatically click on "Easy Apply" buttons when jobs are selected. Please select a job listing to begin.`,
+                  timestamp: Date.now(),
+                });
 
-      // Create and send a prompt for applying to jobs with the resume
-      if (resumeText) {
-        const jobApplyPrompt = `Apply to ${numApplications} job(s) that are displayed on this LinkedIn page that match my qualifications.
+                // Only proceed with sending resume prompt if we have a resume
+                if (resumeText) {
+                  console.log('Resume found, preparing to send job application prompt...');
+                  // Wait longer before sending the prompt to ensure user has time to see a job listing
+                  setTimeout(() => {
+                    sendJobApplicationPrompt(resumeText, numApplications);
+                  }, 3000); // Wait 3 seconds after injecting the button observer
+                } else {
+                  console.log('No resume found, skipping application prompt');
+                  // If no resume is uploaded, inform the user
+                  appendMessage({
+                    actor: Actors.SYSTEM,
+                    content: `Note: You haven't uploaded your resume yet. To enable AI assistance with job applications, please upload your resume by clicking the "Upload Resume" button.`,
+                    timestamp: Date.now(),
+                  });
+                }
+              })
+              .catch(err => {
+                console.error('Failed to inject Easy Apply button observer:', err);
+              });
+          } else {
+            console.error('No active tab found for injecting Easy Apply button observer');
+          }
+        } catch (err) {
+          console.error('Error while setting up Easy Apply button observer:', err);
+        }
+      }, 1500); // Wait 1.5 seconds before injecting the button observer
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error('Navigation error', errorMessage);
+
+      // Report error using the agent system's pattern
+      appendMessage(
+        {
+          actor: Actors.SYSTEM,
+          content: `Error starting job application process: ${errorMessage}`,
+          timestamp: Date.now(),
+        },
+        sessionIdRef.current,
+      );
+
+      // Reset UI state to allow retry
+      setInputEnabled(true);
+      setShowStopButton(false);
+
+      // Ensure connection is stopped on error
+      stopConnection();
+    }
+  };
+
+  // Modify the sendJobApplicationPrompt function to better integrate with the agent logic
+  const sendJobApplicationPrompt = (resume: string, applications: number) => {
+    console.log(`Sending job application prompt for ${applications} application(s)...`);
+
+    const jobApplyPrompt = `Apply to ${applications} job(s) that are displayed on this LinkedIn page that match my qualifications.
 
 MY RESUME:
-${resumeText}
+${resume}
 
 INSTRUCTIONS:
 1. Use my resume information to fill out the job applications.
@@ -657,71 +758,139 @@ INSTRUCTIONS:
    - Require assessment tests
    - Request information not found in my resume
 
-If you can't proceed with an application, most likely there are additonal fields that are not filled in or incorreclty filled in.
+If you can't proceed with an application, most likely there are additional fields that are not filled in or incorrectly filled in.
 Check if there are additional fields or questions that need to be answered (often at the bottom of the form).
 
+Please proceed with applying to ${applications} suitable position(s). Let me know which jobs you've applied to.`;
 
-Please proceed with applying to ${numApplications} suitable position(s). Let me know which jobs you've applied to.`;
+    console.log('Job application prompt prepared, sending to handleSendMessage...');
 
-        // Wait a bit to make sure the LinkedIn page has loaded before sending the prompt
-        setTimeout(() => {
-          handleSendMessage(jobApplyPrompt);
-        }, 2000);
-      } else {
-        // If no resume is uploaded, inform the user
-        appendMessage({
-          actor: Actors.SYSTEM,
-          content: `Note: You haven't uploaded your resume yet. To enable AI assistance with job applications, please upload your resume by clicking the "Upload Resume" button.`,
-          timestamp: Date.now(),
-        });
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error('Navigation error', errorMessage);
-      appendMessage({
-        actor: Actors.SYSTEM,
-        content: errorMessage,
-        timestamp: Date.now(),
-      });
+    // Instead of immediately sending, check the connection state first
+    if (!portRef.current) {
+      console.log('No active connection, setting up connection before sending message');
+      setupConnection();
     }
+
+    // Update UI state to reflect that a task is starting
+    setInputEnabled(false);
+    setShowStopButton(true);
+
+    // Then send the message
+    handleSendMessage(jobApplyPrompt);
   };
 
-  // Function to be injected as a content script to find and click Easy Apply buttons
+  // Improve findAndClickEasyApplyButtons to report back to the agent
   function findAndClickEasyApplyButtons() {
-    // This function will be injected into the LinkedIn page
-    const observer = new MutationObserver(mutations => {
-      // Look for Easy Apply buttons
-      const easyApplyButtons = document.querySelectorAll('button.jobs-apply-button');
+    console.log('[Content Script] Starting Easy Apply button observer setup');
 
-      // Click any Easy Apply buttons found when a job listing is selected
+    // Check if we already have an observer running to prevent duplicates
+    if (window._easyApplyObserver) {
+      console.log('[Content Script] Observer already exists, not creating a new one');
+      return;
+    }
+
+    console.log('[Content Script] Setting up Easy Apply button observer');
+
+    // Throttle the button search to reduce CPU usage
+    let lastCheckTime = 0;
+    const THROTTLE_MS = 500; // Only check every 500ms
+    let buttonsFound = 0;
+    let buttonsClicked = 0;
+
+    // Create a throttled button check function
+    const checkForButtons = () => {
+      const now = Date.now();
+      if (now - lastCheckTime < THROTTLE_MS) return;
+      lastCheckTime = now;
+
+      const easyApplyButtons = document.querySelectorAll('button.jobs-apply-button');
       if (easyApplyButtons.length > 0) {
+        console.log(`[Content Script] Found ${easyApplyButtons.length} Easy Apply button(s)`);
+        buttonsFound = easyApplyButtons.length;
+
         for (const button of Array.from(easyApplyButtons)) {
-          // Only click if it contains "Easy Apply" text
           if (button.textContent && button.textContent.includes('Easy Apply')) {
-            console.log('Clicking Easy Apply button');
+            console.log('[Content Script] Clicking Easy Apply button');
             (button as HTMLElement).click();
+            buttonsClicked++;
+
+            // Try to send a message back to the extension via postMessage
+            try {
+              window.postMessage(
+                {
+                  type: 'EASY_APPLY_CLICKED',
+                  source: 'linkedin-assistant',
+                  buttonText: button.textContent,
+                  totalClicked: buttonsClicked,
+                },
+                '*',
+              );
+            } catch (err) {
+              console.error('[Content Script] Failed to post message back to extension', err);
+            }
+
             break; // Click only the first button found
           }
         }
-      }
-    });
-
-    // Start observing the document with the configured parameters
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    // Also do an initial check for buttons
-    setTimeout(() => {
-      const easyApplyButtons = document.querySelectorAll('button.jobs-apply-button');
-      if (easyApplyButtons.length > 0) {
-        for (const button of Array.from(easyApplyButtons)) {
-          if (button.textContent && button.textContent.includes('Easy Apply')) {
-            console.log('Clicking Easy Apply button (initial check)');
-            (button as HTMLElement).click();
-            break;
-          }
+      } else {
+        // Only log if we previously found buttons and now they're gone
+        if (buttonsFound > 0) {
+          console.log('[Content Script] No Easy Apply buttons currently visible');
+          buttonsFound = 0;
         }
       }
-    }, 2000); // Wait 2 seconds for page to load fully
+    };
+
+    // Be more selective about what we observe - only watch the job listings area
+    // instead of the entire document
+    const targetNode =
+      document.querySelector('.jobs-search-results-list') ||
+      document.querySelector('.jobs-search__job-details') ||
+      document.body;
+
+    console.log(`[Content Script] Target node for observer: ${targetNode.tagName}, class: ${targetNode.className}`);
+
+    // Create our observer with more efficient options
+    const observer = new MutationObserver(mutations => {
+      console.log(`[Content Script] DOM mutations detected: ${mutations.length}`);
+      checkForButtons();
+    });
+
+    // Store the observer in a global variable so we can check for its existence
+    window._easyApplyObserver = observer;
+
+    // Start observing with more restrictive options
+    observer.observe(targetNode, {
+      childList: true, // Watch for added/removed elements
+      subtree: true, // Watch child elements
+      attributes: false, // Don't watch attributes (reduces overhead)
+      characterData: false, // Don't watch text changes (reduces overhead)
+    });
+
+    console.log('[Content Script] Observer started successfully');
+
+    // Do an initial check for buttons
+    console.log('[Content Script] Performing initial button check');
+    setTimeout(checkForButtons, 1000);
+
+    // Perform additional checks at regular intervals
+    const checkInterval = setInterval(() => {
+      console.log('[Content Script] Performing scheduled button check');
+      checkForButtons();
+    }, 3000); // Check every 3 seconds
+
+    // Auto-disconnect after 5 minutes to prevent memory leaks
+    setTimeout(
+      () => {
+        if (window._easyApplyObserver) {
+          console.log('[Content Script] Auto-disconnecting Easy Apply observer after timeout');
+          window._easyApplyObserver.disconnect();
+          window._easyApplyObserver = null;
+          clearInterval(checkInterval);
+        }
+      },
+      5 * 60 * 1000,
+    );
   }
 
   // Create a custom handler for the resume input
@@ -808,6 +977,53 @@ Please proceed with applying to ${numApplications} suitable position(s). Let me 
     // Construct the full URL
     return `https://www.linkedin.com/jobs/search/?keywords=${keywords}${location}${expLevel}${jobType}${datePosted}${remote}${easyApply}`;
   };
+
+  // Add a timeout that forces resetting UI state if agent is stuck for too long
+  useEffect(() => {
+    // If showStopButton is true for more than 3 minutes, something is wrong
+    if (showStopButton) {
+      const timeoutId = setTimeout(
+        () => {
+          console.log('Agent appears to be stuck - resetting UI state');
+          setShowStopButton(false);
+          setInputEnabled(true);
+          stopConnection();
+
+          // Notify user
+          appendMessage({
+            actor: Actors.SYSTEM,
+            content: 'The agent seems to be taking too long. Operation has been cancelled. Please try again.',
+            timestamp: Date.now(),
+          });
+        },
+        3 * 60 * 1000,
+      ); // 3 minutes
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [showStopButton, appendMessage, stopConnection]);
+
+  // Add a listener for messages from content scripts
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Verify origin and structure
+      if (event.data.source === 'linkedin-assistant') {
+        if (event.data.type === 'EASY_APPLY_CLICKED') {
+          console.log('Received Easy Apply button click notification:', event.data);
+
+          // Add a system message to inform the user
+          appendMessage({
+            actor: Actors.SYSTEM,
+            content: `Easy Apply button clicked for a job listing. Application form should now be open.`,
+            timestamp: Date.now(),
+          });
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [appendMessage]);
 
   return (
     <div>
