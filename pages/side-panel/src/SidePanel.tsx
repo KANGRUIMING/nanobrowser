@@ -30,6 +30,7 @@ const SidePanel = () => {
   const [selectedDatePosted, setSelectedDatePosted] = useState('');
   const [preferredLocation, setPreferredLocation] = useState('');
   const [isRemote, setIsRemote] = useState(false);
+  const [numApplications, setNumApplications] = useState(1);
 
   const [showJobPreferences, setShowJobPreferences] = useState(false);
   const [showUploadResume, setShowUploadResume] = useState(false);
@@ -578,6 +579,8 @@ Use the resume to fill in personal, educational, and experience details in each 
 If LinkedinIf you can't proceed in the application, check if all fields have been filled in. 
 If you further can't proceed, scroll down on the Linkedin popup page to see if there are additonal questions to answer.
 
+Number of applications to submit: ${numApplications}
+
 ${resumeText}
 `;
 
@@ -975,6 +978,29 @@ ${resumeText}
                             Remote?
                           </label>
                         </div>
+                      </div>
+
+                      {/* Number of Applications */}
+                      <div className={`mb-4 px-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                        <label
+                          htmlFor="numApplications"
+                          className={`block text-sm font-medium ${isDarkMode ? 'text-sky-400' : 'text-sky-600'} mb-1`}>
+                          Number of Applications
+                        </label>
+                        <input
+                          id="numApplications"
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={numApplications}
+                          onChange={e => setNumApplications(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
+                          className={`w-full px-3 py-2 rounded-md border ${
+                            isDarkMode
+                              ? 'bg-slate-800 border-sky-800 text-white'
+                              : 'bg-white border-sky-200 text-gray-800'
+                          } focus:outline-none focus:ring-2 ${isDarkMode ? 'focus:ring-sky-500' : 'focus:ring-sky-300'}`}
+                        />
+                        <div className="text-xs mt-1 text-gray-500">Specify how many applications to submit (1-10)</div>
                       </div>
 
                       <div className="flex justify-end px-3 mb-4">
